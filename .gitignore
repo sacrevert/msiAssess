@@ -1,0 +1,12 @@
+.Rproj.user
+.Rhistory
+.RData
+.RDataTmp
+.RDataTmp1
+.Ruserdata
+.Renviron
+.env
+.DS_Store
+/cache/
+/output/
+/tmp/

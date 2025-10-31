@@ -16,15 +16,15 @@ observed species’ index standard errors, and a Bayesian version of
 Soldaat’s Monte Carlo method ([L. L. Soldaat et al.,
 2017](#ref-soldaatMonteCarlo2017)) with user-controlled in-model
 imputation of missing data. Two novel Bayesian model types (“no pooling”
-and a “partial pooling” models of growth-rates with common annual
-species-level “shocks”) are also included.
+and “partial pooling” models of growth-rates with common annual
+species-level “shocks”) are also included for comparative purposes.
 
 The simulation framework gives the user control over a range of
 parameters, and allows for the inclusion of missingness patterns that
 are “Missing Not At Random” (MNAR) as a test of how the different MSIs
-perform when their assumptions (e.g. species Missing At Random, MAR,
-condition on the model structure) are violated to varying degrees, as is
-quite common when heterogeneous data sources are combined in MSIs,
+perform when their assumptions (e.g. species Missing At Random \[MAR\]
+conditional on the model structure) are violated to varying degrees, as
+is quite common when heterogeneous data sources are combined in MSIs,
 and/or when species time-series exhibit strong time-varying biases (e.g.
 R. J. Boyd et al. ([2025](#ref-boydUsingCausal2025))).
 
@@ -69,8 +69,8 @@ sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
                                        p_init = 1))
 ```
 
-These will be described in more detail when the code is incorporate into
-an R package, although inspection of the `generate_mu()` and
+These will be described in more detail when the code is incorporated
+into an R package, although inspection of the `generate_mu()` and
 `simulate_species_data()` should make it clear what each option is
 doing.
 

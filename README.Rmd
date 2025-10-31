@@ -30,9 +30,9 @@ source(file = here("scripts/00_newSimsFramework_30102025.R"))
 <!-- badges: start -->
 <!-- badges: end -->
 
-msiAssess allows the user to fit a set of Bayesian models for multi-species (biodiversity) indicators to both simulated and empirical data. The models will be explained in detail in the coming months, but include a version of the Freeman's "generic method" [@freemanGenericMethod2021] that allows for variably observed species' index standard errors, and a Bayesian version of Soldaat's Monte Carlo method [@soldaatMonteCarlo2017] with user-controlled in-model imputation of missing data. Two novel Bayesian model types ("no pooling" and a "partial pooling" models of growth-rates with common annual species-level "shocks") are also included.
+msiAssess allows the user to fit a set of Bayesian models for multi-species (biodiversity) indicators to both simulated and empirical data. The models will be explained in detail in the coming months, but include a version of the Freeman's "generic method" [@freemanGenericMethod2021] that allows for variably observed species' index standard errors, and a Bayesian version of Soldaat's Monte Carlo method [@soldaatMonteCarlo2017] with user-controlled in-model imputation of missing data. Two novel Bayesian model types ("no pooling" and "partial pooling" models of growth-rates with common annual species-level "shocks") are also included for comparative purposes.
 
-The simulation framework gives the user control over a range of parameters, and allows for the inclusion of missingness patterns that are "Missing Not At Random" (MNAR) as a test of how the different MSIs perform when their assumptions (e.g. species Missing At Random, MAR, condition on the model structure) are violated to varying degrees, as is quite common when heterogeneous data sources are combined in MSIs, and/or when species time-series exhibit strong time-varying biases (e.g. @boydUsingCausal2025).
+The simulation framework gives the user control over a range of parameters, and allows for the inclusion of missingness patterns that are "Missing Not At Random" (MNAR) as a test of how the different MSIs perform when their assumptions (e.g. species Missing At Random [MAR] conditional on the model structure) are violated to varying degrees, as is quite common when heterogeneous data sources are combined in MSIs, and/or when species time-series exhibit strong time-varying biases (e.g. @boydUsingCausal2025).
 
 ## Basic usage
 
@@ -72,7 +72,7 @@ sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
                                        p_init = 1))
 ```
 
-These will be described in more detail when the code is incorporate into an R package, although inspection of the `generate_mu()` and `simulate_species_data()` should make it clear what each option is doing.
+These will be described in more detail when the code is incorporated into an R package, although inspection of the `generate_mu()` and `simulate_species_data()` should make it clear what each option is doing.
 
 The other options passed to `run_full_analysis()` are briefly described in code comments below.
 

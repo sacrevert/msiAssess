@@ -10,3 +10,7 @@
 /cache/
 /output/
 /tmp/
+README.Rmd
+/README_files/
+harvard.csl
+references.bib

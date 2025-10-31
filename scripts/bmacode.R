@@ -1,3 +1,5 @@
+## JAGS code from https://github.com/BiologicalRecordsCentre/BRCindicators for reference only
+
 smoothing <- function() {'
     ######################### Smoothing #######################
 

@@ -1406,39 +1406,39 @@ sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
                                        rho1=1.2,
                                        rho0=0.2,
                                        p_init=1))
-out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
-                         sim_args = sim_args, # as above
-                         #fit_models = c("partial","freeman", "nopool","bayes_geomean"),
-                         #fit_models = c("partial","freeman","bayes_geomean"),
-                         #fit_models = c("partial","freeman", "nopool"),
-                         #fit_models = c("partial"),
-                         #fit_models = c("freeman"),
-                         #fit_models = c("freeman","bayes_geomean"),
-                         fit_models = c("bayes_geomean"),
-                         ## Model-specific settings
-                         jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-                         jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-                         jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
-                         jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
-                         smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
-                         plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
-                         # impute missing spp/year combinations
-                         impute_all_geomean = T, # if false, then under MNAR the estimand differs from other models
-                         plot_MNAR = TRUE, # plot sampled species "truth" alongside actual truth
-                         ## Cross-model settings
-                         # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
-                         # but only if obs_var_model not specified
-                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE),
-                         ## Growth-rate presentation scale (model returns both anyway, this is for plot)
-                         growth_scale = "log")
-# Convergence report
-out$checks
-# Plots
-print(out$plots$MSI) # M_prime equivalents
-print(out$plots$CumLog) # M equivalents where applicable
-print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
-# Inclusion diagnostics
-evaluate_inclusion_process(out$sim, verbose = TRUE)
+# out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
+#                          sim_args = sim_args, # as above
+#                          #fit_models = c("partial","freeman", "nopool","bayes_geomean"),
+#                          #fit_models = c("partial","freeman","bayes_geomean"),
+#                          #fit_models = c("partial","freeman", "nopool"),
+#                          #fit_models = c("partial"),
+#                          #fit_models = c("freeman"),
+#                          #fit_models = c("freeman","bayes_geomean"),
+#                          fit_models = c("bayes_geomean"),
+#                          ## Model-specific settings
+#                          jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+#                          jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+#                          jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
+#                          jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
+#                          smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
+#                          plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
+#                          # impute missing spp/year combinations
+#                          impute_all_geomean = T, # if false, then under MNAR the estimand differs from other models
+#                          plot_MNAR = TRUE, # plot sampled species "truth" alongside actual truth
+#                          ## Cross-model settings
+#                          # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
+#                          # but only if obs_var_model not specified
+#                          brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE),
+#                          ## Growth-rate presentation scale (model returns both anyway, this is for plot)
+#                          growth_scale = "log")
+# # Convergence report
+# out$checks
+# # Plots
+# print(out$plots$MSI) # M_prime equivalents
+# print(out$plots$CumLog) # M equivalents where applicable
+# print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
+# # Inclusion diagnostics
+# evaluate_inclusion_process(out$sim, verbose = TRUE)
 
 #### TO DO ####
 ## Double check loge/log10/logit implications, especially for SEs

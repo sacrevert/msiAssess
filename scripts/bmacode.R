@@ -82,29 +82,29 @@ bma_model_Smooth <- function(incl.2deriv = FALSE,
         spgrowth[s,t] ~ dnorm(logLambda[t], tau.spi)
     }}"
     
-    if(Y1perfect){
+    if(Y1perfect){ # y1perfect = T
       part3 <- "
     for (s in 1:nsp){
-      for (t in 1:(FY[s]-1)){
-        spindex[s,t] <- spindex[s,t+1] - spgrowth[s,t]
+      for (t in 1:(FY[s]-1)){ # e.g. FY[s] = 10 and nyears = 20, loop then 1:9
+        spindex[s,t] <- spindex[s,t+1] - spgrowth[s,t] # t = 9 means spindex for year 10 minus backwards 1 growth step from estimate[,10]
     }
 
     spindex[s,FY[s]] <- estimate[s,FY[s]] # we assume the first year is known without error
 
-    for (t in (FY[s]+1):(nyears)){
-      spindex[s,t] <- estimate[s,FY[s]] + sum(spgrowth[s,FY[s]:(t-1)])
-      estimate[s,t] ~ dnorm(spindex[s,t], tau.obs[s,t])
+    for (t in (FY[s]+1):(nyears)){ # from year 11 in example
+      spindex[s,t] <- estimate[s,FY[s]] + sum(spgrowth[s,FY[s]:(t-1)]) # index in 10 = year 10 anchor plus sum of growths from 10 to 9
+      estimate[s,t] ~ dnorm(spindex[s,t], tau.obs[s,t]) # estimate yr 11 drawn from spindex for yr 11 etc.
       tau.obs[s,t] <- pow(theta, -2)
     }}"
-    } else {
+    } else { # y1perfect = F
       part3 <- "
     for (s in 1:nsp){
-      for (t in 1:FY[s]){
-        spindex[s,t] <- spindex[s,t+1] - spgrowth[s,t]
+      for (t in 1:FY[s]){ # years 1 to 10 in example
+        spindex[s,t] <- spindex[s,t+1] - spgrowth[s,t] # t = 10 means spindex for yr 11 - growth step for year 10
       }
 
-      for (t in (FY[s]+1):(nyears)){
-        spindex[s,t] <- estimate[s,FY[s]] + sum(spgrowth[s,FY[s]:(t-1)])
+      for (t in (FY[s]+1):(nyears)){ # years 11 to nyears (20)
+        spindex[s,t] <- estimate[s,FY[s]] + sum(spgrowth[s,FY[s]:(t-1)]) # year 10 estimate + sum of growth from 10 to 9
         estimate[s,t] ~ dnorm(spindex[s,t], tau.obs[s,t])
         tau.obs[s,t] <- pow(theta, -2)
       }}"
@@ -157,3 +157,6 @@ bma_model_Smooth <- function(incl.2deriv = FALSE,
   
   return(model)
 }
+
+
+foo <- bma_model_Smooth(incl.2deriv = FALSE, seFromData = FALSE, Y1perfect = TRUE)

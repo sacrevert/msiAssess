@@ -622,7 +622,7 @@ prepare_jags_data_freeman <- function(mat_index, mat_se = NULL, years = NULL,
                                       seFromData   = NULL, # legacy
                                       Y1perfect    = TRUE,
                                       tiny_tau     = 1e-12,
-                                      m.scale      = c("loge","log10","logit")) {
+                                      m.scale      = c("loge","log10","logit")) { # Note that loge assumes that data already on natural log scale
   m.scale <- match.arg(m.scale)
   stopifnot(is.matrix(mat_index))
   nsp <- nrow(mat_index); ny <- ncol(mat_index)
@@ -637,7 +637,7 @@ prepare_jags_data_freeman <- function(mat_index, mat_se = NULL, years = NULL,
   if (!ovm %in% 1:4) stop("obs_var_model must be 1,2,3 or 4.")
   
   # Transform index to loge and build observation mask
-  Y <- .to_loge(mat_index, m.scale)
+  Y <- .to_loge(mat_index, m.scale) # Note that loge assumes that data already on natural log scale
   obs_mask <- 1L * is.finite(Y)
   
   # Transform SEs to loge scale if provided; allow missing SEs always
@@ -1069,6 +1069,10 @@ run_full_analysis <- function(data_source = c("simulate","empirical"),
     sim <- do.call(simulate_species_data, sim_args)
   } else {
     stopifnot(!is.null(empirical_index_mat))
+    if (data_source == "empirical" && brc_opts$m.scale != "loge") {
+      stop("For empirical data, brc_opts$m.scale must be 'loge' because indices are ",
+           "already converted to loge in as_sim_from_empirical().")
+    }
     sim <- as_sim_from_empirical(empirical_index_mat, empirical_se_mat, empirical_years, m.scale = empirical_m_scale)
   }
   
@@ -1428,7 +1432,8 @@ out <- run_full_analysis(data_source = "simulate", # simulated data or empirical
                          ## Cross-model settings
                          # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
                          # but only if obs_var_model not specified
-                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE),
+                         # m.scale = loge assumes data already on natural log scale
+                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE, m.scale = "loge"),
                          ## Growth-rate presentation scale (model returns both anyway, this is for plot)
                          growth_scale = "log")
 # Convergence report
@@ -1441,7 +1446,7 @@ print(out$plots$Growth) # annual growth on scale specified in run_full_analysis(
 evaluate_inclusion_process(out$sim, verbose = TRUE)
 
 #### TO DO ####
-## Double check loge/log10/logit implications, especially for SEs
+## Fix back-transformation of logit-scale empirical data (currently uses exp(), which results in different estimand)
 ## Shrinkage evaluation!
 ## Visualise (sample of) species' trends
 

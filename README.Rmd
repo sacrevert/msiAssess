@@ -41,7 +41,7 @@ A wrapper function `run_full_analysis()` is provided for convenience, although t
 ```{r}
 ## Specify simulation settings
 sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
-                 ## Growth rate DGP
+                 ## Growth rate data-generating process (DGP)
                  dgp_mode = "spline", # "spline","rw","ar1","changepoint","seasonal","mixture"
                  ## DGP options (sub-options apply to specific DGPs as stated)
                  # spline options
@@ -53,12 +53,12 @@ sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
                  # seasonal
                  A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
                  # mixture of random walks
-                 K = 5, # number of groups
+                 K_guilds = 5, # number of groups
                  ## Simulate species/observation options (cross-DGP)
                  # species/state variation
                  sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
                  innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t only)
-                 sp_trend = "random_slope", # "none" or "random_slope"
+                 sp_trend = "none", # "none" or "random_slope"
                  sigma_gamma = 0.05, log_sd_se = 0.35, 
                  use_delta = FALSE, # cross-species annual shocks?
                  # observation model
@@ -95,12 +95,12 @@ out <- run_full_analysis(data_source = "simulate", # simulated data or empirical
                          ## Cross-model settings
                          # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
                          # but only if obs_var_model not specified
-                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE),
+                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE, m.scale = "loge"),
                          ## Growth-rate presentation scale (model returns both anyway, this is for plot)
                          growth_scale = "log")
 ```
 
-Note that in this example we are just running very short chains, and so it won't be surprising if we don't have satisfactory convergence everywhere. In the example run we are using a spline-based DGP for the underlying growth rates. This is congenial to the actual models (i.e. the DGP assumed by the models is actually true). We are not including any MNAR missingness, or any missingness at all. In general we expect all models to do well in this scenario, and for the "true" curves to overlap. Indeed, in terms of the geometric mean-based indicator, all models overlie the truth with high confidence.
+Note that in this example we are just running very short chains, and so it won't be surprising if we don't have satisfactory convergence everywhere. In the example run we are using a spline-based data-generating process (DGP) for the underlying growth rates. This is congenial to the actual models (i.e. the DGP assumed by the models is actually true). We are not including any MNAR missingness, or any missingness at all. In general we expect all models to do well in this scenario, and for the "true" curves to overlap. Indeed, in terms of the geometric mean-based indicator, all models overlie the truth with high confidence.
 
 ```{r}
 # Check convergence (preview only)

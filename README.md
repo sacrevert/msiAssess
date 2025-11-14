@@ -38,7 +38,7 @@ list that is then passed to `run_full_analysis()`.
 ``` r
 ## Specify simulation settings
 sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
-                 ## Growth rate DGP
+                 ## Growth rate data-generating process (DGP)
                  dgp_mode = "spline", # "spline","rw","ar1","changepoint","seasonal","mixture"
                  ## DGP options (sub-options apply to specific DGPs as stated)
                  # spline options
@@ -50,12 +50,12 @@ sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
                  # seasonal
                  A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
                  # mixture of random walks
-                 K = 5, # number of groups
+                 K_guilds = 5, # number of groups
                  ## Simulate species/observation options (cross-DGP)
                  # species/state variation
                  sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
                  innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t only)
-                 sp_trend = "random_slope", # "none" or "random_slope"
+                 sp_trend = "none", # "none" or "random_slope"
                  sigma_gamma = 0.05, log_sd_se = 0.35, 
                  use_delta = FALSE, # cross-species annual shocks?
                  # observation model
@@ -96,7 +96,7 @@ out <- run_full_analysis(data_source = "simulate", # simulated data or empirical
                          ## Cross-model settings
                          # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
                          # but only if obs_var_model not specified
-                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE),
+                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE, m.scale = "loge"),
                          ## Growth-rate presentation scale (model returns both anyway, this is for plot)
                          growth_scale = "log")
 ```
@@ -143,13 +143,14 @@ out <- run_full_analysis(data_source = "simulate", # simulated data or empirical
 
 Note that in this example we are just running very short chains, and so
 it won’t be surprising if we don’t have satisfactory convergence
-everywhere. In the example run we are using a spline-based DGP for the
-underlying growth rates. This is congenial to the actual models
-(i.e. the DGP assumed by the models is actually true). We are not
-including any MNAR missingness, or any missingness at all. In general we
-expect all models to do well in this scenario, and for the “true” curves
-to overlap. Indeed, in terms of the geometric mean-based indicator, all
-models overlie the truth with high confidence.
+everywhere. In the example run we are using a spline-based
+data-generating process (DGP) for the underlying growth rates. This is
+congenial to the actual models (i.e. the DGP assumed by the models is
+actually true). We are not including any MNAR missingness, or any
+missingness at all. In general we expect all models to do well in this
+scenario, and for the “true” curves to overlap. Indeed, in terms of the
+geometric mean-based indicator, all models overlie the truth with high
+confidence.
 
 ``` r
 # Check convergence (preview only)
@@ -216,39 +217,39 @@ evaluate_inclusion_process(out$sim, verbose = TRUE)
     [26] NA NA NA NA
 
     $diagnostics
-       year n_pairs sd_I       sd_r         reason
-    1     2      40    0 0.06733328 no_variation_I
-    2     3      40    0 0.06733328 no_variation_I
-    3     4      40    0 0.06733328 no_variation_I
-    4     5      40    0 0.06733328 no_variation_I
-    5     6      40    0 0.06733328 no_variation_I
-    6     7      40    0 0.06733328 no_variation_I
-    7     8      40    0 0.06733328 no_variation_I
-    8     9      40    0 0.06733328 no_variation_I
-    9    10      40    0 0.06733328 no_variation_I
-    10   11      40    0 0.06733328 no_variation_I
-    11   12      40    0 0.06733328 no_variation_I
-    12   13      40    0 0.06733328 no_variation_I
-    13   14      40    0 0.06733328 no_variation_I
-    14   15      40    0 0.06733328 no_variation_I
-    15   16      40    0 0.06733328 no_variation_I
-    16   17      40    0 0.06733328 no_variation_I
-    17   18      40    0 0.06733328 no_variation_I
-    18   19      40    0 0.06733328 no_variation_I
-    19   20      40    0 0.06733328 no_variation_I
-    20   21      40    0 0.06733328 no_variation_I
-    21   22      40    0 0.06733328 no_variation_I
-    22   23      40    0 0.06733328 no_variation_I
-    23   24      40    0 0.06733328 no_variation_I
-    24   25      40    0 0.06733328 no_variation_I
-    25   26      40    0 0.06733328 no_variation_I
-    26   27      40    0 0.06733328 no_variation_I
-    27   28      40    0 0.06733328 no_variation_I
-    28   29      40    0 0.06733328 no_variation_I
-    29   30      40    0 0.06733328 no_variation_I
+       year n_pairs sd_I sd_r            reason
+    1     2      40    0    0 no_variation_both
+    2     3      40    0    0 no_variation_both
+    3     4      40    0    0 no_variation_both
+    4     5      40    0    0 no_variation_both
+    5     6      40    0    0 no_variation_both
+    6     7      40    0    0 no_variation_both
+    7     8      40    0    0 no_variation_both
+    8     9      40    0    0 no_variation_both
+    9    10      40    0    0 no_variation_both
+    10   11      40    0    0 no_variation_both
+    11   12      40    0    0 no_variation_both
+    12   13      40    0    0 no_variation_both
+    13   14      40    0    0 no_variation_both
+    14   15      40    0    0 no_variation_both
+    15   16      40    0    0 no_variation_both
+    16   17      40    0    0 no_variation_both
+    17   18      40    0    0 no_variation_both
+    18   19      40    0    0 no_variation_both
+    19   20      40    0    0 no_variation_both
+    20   21      40    0    0 no_variation_both
+    21   22      40    0    0 no_variation_both
+    22   23      40    0    0 no_variation_both
+    23   24      40    0    0 no_variation_both
+    24   25      40    0    0 no_variation_both
+    25   26      40    0    0 no_variation_both
+    26   27      40    0    0 no_variation_both
+    27   28      40    0    0 no_variation_both
+    28   29      40    0    0 no_variation_both
+    29   30      40    0    0 no_variation_both
 
     $note
-    [1] "All annual selection–growth correlations are NA for T-1 = 29. This is expected when inclusion or growth lacks cross-species variation (e.g., inclusion all 1s). Reason summary: [no_variation_I×29]. Source of r: mu_true + delta_true (+ gamma_s)."
+    [1] "All annual selection–growth correlations are NA for T-1 = 29. This is expected when inclusion or growth lacks cross-species variation (e.g., inclusion all 1s). Reason summary: [no_variation_both×29]. Source of r: mu_true + delta_true (+ gamma_s)."
 
 <div id="refs" class="references csl-bib-body hanging-indent"
 entry-spacing="0" line-spacing="2">

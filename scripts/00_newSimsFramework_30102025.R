@@ -1489,74 +1489,220 @@ evaluate_inclusion_process <- function(sim, verbose = TRUE) {
   )
 }
 
-# 11) Example usage ####
-sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
-                 ## Growth rate DGP
-                 dgp_mode = "spline", # "spline","rw","ar1","changepoint","seasonal","mixture"
-                 ## DGP options
-                 # spline options
-                 df_mu = 6, # default
-                 # RW / AR1
-                 sigma_eta = 0.05, phi = 0.7,
-                 # changepoint
-                 n_cp = 2, jump_sd = 0.15, piecewise_linear = FALSE,
-                 # seasonal
-                 A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
-                 # mixture of random walks
-                 K_guilds = 5, # number of groups
-                 ## Simulate species options
-                 # species/state variation
-                 sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
-                 innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t)
-                 sp_trend = "none", sigma_gamma = 0.05, log_sd_se = 0.35, # "none" or "random_slope"
-                 use_delta = FALSE, # cross-species annual shocks?
-                 # observation model
-                 sigma_obs_mean = 0.02, prop_missing = 0,
-                 # Inclusion MNAR (additional to prop_missing)
-                 inclusion_bias = list(enabled=F, # include inclusion bias?
-                                       a0=-0.4,
-                                       a1=3.0,
-                                       rho1=1.2,
-                                       rho0=0.2,
-                                       p_init=1))
-out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
-                         sim_args = sim_args, # as above
-                         fit_models = c("partial","freeman", "nopool","bayes_geomean"),
-                         #fit_models = c("partial","freeman","bayes_geomean"),
-                         #fit_models = c("partial","freeman", "nopool"),
-                         #fit_models = c("partial"),
-                         #fit_models = c("freeman"),
-                         #fit_models = c("freeman","bayes_geomean"),
-                         #fit_models = c("bayes_geomean"),
-                         ## Model-specific settings
-                         jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-                         jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-                         jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
-                         jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
-                         smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
-                         plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
-                         # impute missing spp/year combinations
-                         impute_all_geomean = T, # if false, then under MNAR the estimand differs from other models
-                         plot_MNAR = TRUE, # plot sampled species "truth" alongside actual truth
-                         ## Cross-model settings
-                         # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
-                         # but only if obs_var_model not specified
-                         # m.scale = loge assumes data already on natural log scale
-                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE, m.scale = "loge"),
-                         ## Growth-rate presentation scale (model returns both anyway, this is for plot)
-                         growth_scale = "log")
-# Convergence report
-out$checks
-# Plots
-print(out$plots$MSI) # M_prime equivalents
-print(out$plots$CumLog) # M equivalents where applicable
-print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
-# Inclusion diagnostics
-evaluate_inclusion_process(out$sim, verbose = TRUE)
+# 11) Species plotting function ####
+# Plot a sample of species-level trends from run_full_analysis()
+# - out: the list returned by run_full_analysis() -- simulated or empirical
+# - species: optional numeric indices or rownames of species to plot
+# - n_sample: if species is NULL, draw this many species at random
+# - show_truth: include latent l_true (if available; usually simulated data)
+# - show_obs: include observed y
+# - scale: "log" plots l and y as stored (log scale);
+#          "index" plots exp(l - baseline) so each species is 1 in its first finite year
+plot_species_trends <- function(out, # only observed plotted if "sim" is actually empirical, otherwise both true and obs
+                                species = NULL,
+                                n_sample = 12,
+                                show_truth = TRUE,
+                                show_obs = TRUE,
+                                scale = c("log","index")) {
+  scale <- match.arg(scale)
+    sim <- out$sim
+  if (is.null(sim))
+    stop("`out` must be the list returned by run_full_analysis(), with a `sim` component.")
+    Y <- sim$y
+  l_true <- sim$l_true
+  years <- sim$years
+  nsp <- nrow(Y)
+  ny <- ncol(Y)
+  if (is.null(years)) years <- seq_len(ny)
+  
+  # Pull measurement scale (default to "loge" if missing)
+  m_scale <- sim$meta$m_scale %||% "loge"
+  
+  # Choose species to plot
+  if (is.null(species)) {
+    n_sample <- min(n_sample, nsp)
+    species <- sort(sample.int(nsp, n_sample))
+  } else {
+    if (is.numeric(species)) {
+      if (any(species < 1 | species > nsp))
+        stop("`species` indices out of range.")
+    } else if (is.character(species) && !is.null(rownames(Y))) {
+      idx <- match(species, rownames(Y))
+      if (any(is.na(idx)))
+        stop("Some species names not found in rownames(Y).")
+      species <- idx
+    } else {
+      stop("`species` must be numeric indices or (if rownames present) character names.")
+    }
+  }
+  
+  years_rep <- rep(years, times = length(species))
+  sp_id     <- rep(species, each = length(years))
+  
+  # Helper to transform to plotting scale
+  transform_to_scale <- function(mat, scale, m_scale) {
+    nsp <- nrow(mat); ny <- ncol(mat)
+    out <- matrix(NA_real_, nsp, ny)
+    
+    for (s in seq_len(nsp)) {
+      row <- mat[s, ]
+      t0 <- which(is.finite(row))[1]
+      if (is.na(t0)) next
+      if (scale == "log") {
+        # Just show the native latent scale
+        out[s, ] <- row
+      } else { # scale == "index"
+        if (m_scale == "loge") {
+          # log-index -> multiplicative index relative to first year
+          out[s, ] <- exp(row - row[t0])
+        } else if (m_scale == "log10") {
+          # log10-index (on loge scale) -> multiplicative index
+          out[s, ] <- 10^(row - row[t0])
+        } else if (m_scale == "logit") {
+          # logit-occupancy -> relative occupancy p_t / p_{t0}
+          p <- plogis(row)
+          out[s, ] <- p / p[t0]
+        } else {
+          stop("Unknown m_scale: ", m_scale)
+        }
+      }
+    }
+    out
+  }
+  df_list <- list()
+  
+  # Truth layer (latent indices)
+  if (show_truth && !is.null(l_true)) {
+    mat <- l_true[species, , drop = FALSE]
+    mat <- transform_to_scale(mat, scale, m_scale)
+    
+    df_truth <- tibble::tibble(
+      species = factor(sp_id),
+      year = years_rep,
+      value = as.vector(t(mat)),
+      type = "truth"
+    )
+    df_list[[length(df_list) + 1]] <- df_truth
+  }
+  
+  # Observed layer
+  if (show_obs) {
+    mat <- Y[species, , drop = FALSE]
+    mat <- transform_to_scale(mat, scale, m_scale)
+    
+    df_obs <- tibble::tibble(
+      species = factor(sp_id),
+      year = years_rep,
+      value = as.vector(t(mat)),
+      type = "obs"
+    )
+    df_obs <- df_obs[is.finite(df_obs$value), ]
+    df_list[[length(df_list) + 1]] <- df_obs
+  }
+  
+  if (!length(df_list))
+    stop("Nothing to plot: either both show_truth/show_obs are FALSE, or required components are missing.")
+  
+  df <- dplyr::bind_rows(df_list)
+  
+  # y-axis label depending on scale and measurement scale
+  ylab <- if (scale == "log") {
+    if (m_scale == "loge") "Log-index (loge)"
+    else if (m_scale == "log10") "Log10 index"
+    else if (m_scale == "logit") "Logit occupancy"
+    else "Latent scale"
+  } else {
+    if (m_scale == "logit") "Relative occupancy (baseline = 1)"
+    else "Relative index (baseline = 1)"
+  }
+  
+  ggplot2::ggplot() +
+    ggplot2::geom_line(
+      data = dplyr::filter(df, type == "truth"),
+      ggplot2::aes(x = year, y = value, group = species),
+      linewidth = 0.7, alpha = 0.8, colour = "grey20"
+    ) +
+    ggplot2::geom_point(
+      data = dplyr::filter(df, type == "obs"),
+      ggplot2::aes(x = year, y = value),
+      size = 0.9, alpha = 0.7, colour = "steelblue"
+    ) +
+    ggplot2::facet_wrap(~ species, scales = "free_y") +
+    ggplot2::labs(x = "Year", y = ylab) +
+    .msitheme()
+}
+
+# # 12) Example usage ####
+# sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
+#                  ## Growth rate DGP
+#                  dgp_mode = "spline", # "spline","rw","ar1","changepoint","seasonal","mixture"
+#                  ## DGP options
+#                  # spline options
+#                  df_mu = 6, # default
+#                  # RW / AR1
+#                  sigma_eta = 0.05, phi = 0.7,
+#                  # changepoint
+#                  n_cp = 2, jump_sd = 0.15, piecewise_linear = FALSE,
+#                  # seasonal
+#                  A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
+#                  # mixture of random walks
+#                  K_guilds = 5, # number of groups
+#                  ## Simulate species options
+#                  # species/state variation
+#                  sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
+#                  innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t)
+#                  sp_trend = "none", sigma_gamma = 0.05, log_sd_se = 0.35, # "none" or "random_slope"
+#                  use_delta = FALSE, # cross-species annual shocks?
+#                  # observation model
+#                  sigma_obs_mean = 0.02, prop_missing = 0,
+#                  # Inclusion MNAR (additional to prop_missing)
+#                  inclusion_bias = list(enabled=F, # include inclusion bias?
+#                                        a0=-0.4,
+#                                        a1=3.0,
+#                                        rho1=1.2,
+#                                        rho0=0.2,
+#                                        p_init=1))
+# out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
+#                          sim_args = sim_args, # as above
+#                          fit_models = c("partial","freeman", "nopool","bayes_geomean"),
+#                          #fit_models = c("partial","freeman","bayes_geomean"),
+#                          #fit_models = c("partial","freeman", "nopool"),
+#                          #fit_models = c("partial"),
+#                          #fit_models = c("freeman"),
+#                          #fit_models = c("freeman","bayes_geomean"),
+#                          #fit_models = c("bayes_geomean"),
+#                          ## Model-specific settings
+#                          jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+#                          jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+#                          jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
+#                          jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
+#                          smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
+#                          plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
+#                          # impute missing spp/year combinations
+#                          impute_all_geomean = T, # if false, then under MNAR the estimand differs from other models
+#                          plot_MNAR = TRUE, # plot sampled species "truth" alongside actual truth
+#                          ## Cross-model settings
+#                          # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
+#                          # but only if obs_var_model not specified
+#                          # m.scale = loge assumes data already on natural log scale
+#                          brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE, m.scale = "loge"),
+#                          ## Growth-rate presentation scale (model returns both anyway, this is for plot)
+#                          growth_scale = "log")
+# ## Convergence report
+# out$checks
+# ## Plots
+# print(out$plots$MSI) # M_prime equivalents
+# print(out$plots$CumLog) # M equivalents where applicable
+# print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
+# ## Inclusion diagnostics
+# evaluate_inclusion_process(out$sim, verbose = TRUE)
+# ## Spp trends (grey lin = latent process; blue dot = (noisy) observations
+# # Plot 12 randomly chosen species on log scale
+# plot_species_trends(out, n_sample = 12, scale = "log")
+# # Plot specific species (by index) as baseline-1 indices
+# plot_species_trends(out, species = c(1, 5, 9), scale = "index")
 
 #### TO DO ####
 ## Shrinkage evaluation!
-## Visualise (sample of) species' trends
-
 
 # End of file #

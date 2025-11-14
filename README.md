@@ -126,8 +126,8 @@ out <- run_full_analysis(data_source = "simulate", # simulated data or empirical
        Allocating nodes
     Graph information:
        Observed stochastic nodes: 1200
-       Unobserved stochastic nodes: 1218
-       Total graph size: 33363
+       Unobserved stochastic nodes: 1283
+       Total graph size: 25429
 
     Initializing model
 
@@ -136,8 +136,8 @@ out <- run_full_analysis(data_source = "simulate", # simulated data or empirical
        Allocating nodes
     Graph information:
        Observed stochastic nodes: 1200
-       Unobserved stochastic nodes: 1283
-       Total graph size: 25429
+       Unobserved stochastic nodes: 1218
+       Total graph size: 33363
 
     Initializing model
 
@@ -249,7 +249,22 @@ evaluate_inclusion_process(out$sim, verbose = TRUE)
     29   30      40    0    0 no_variation_both
 
     $note
-    [1] "All annual selection–growth correlations are NA for T-1 = 29. This is expected when inclusion or growth lacks cross-species variation (e.g., inclusion all 1s). Reason summary: [no_variation_both×29]. Source of r: mu_true + delta_true (+ gamma_s)."
+    [1] "All annual selection-growth correlations are NA for T-1 = 29. This is expected when inclusion or growth lacks cross-species variation (e.g., inclusion all 1s). Reason summary: [no_variation_bothx29]. Source of r: mu_true + delta_true (+ gamma_s)."
+
+``` r
+## Spp trends (grey lin = latent process; blue dot = (noisy) observations
+# Plot 12 randomly chosen species on log scale
+plot_species_trends(out, n_sample = 12, scale = "log")
+```
+
+<img src="README_files/figure-gfm/unnamed-chunk-4-4.png" style="display: block; margin: auto;" />
+
+``` r
+# Plot specific species (by index) as baseline-1 indices
+plot_species_trends(out, species = c(1, 5, 9), scale = "index")
+```
+
+<img src="README_files/figure-gfm/unnamed-chunk-4-5.png" style="display: block; margin: auto;" />
 
 <div id="refs" class="references csl-bib-body hanging-indent"
 entry-spacing="0" line-spacing="2">

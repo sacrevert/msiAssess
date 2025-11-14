@@ -14,7 +14,7 @@ suppressPackageStartupMessages({
 
 # Utility ####
 `%||%` <- function(x, y) if (is.null(x)) y else x
-logit  <- function(p) log(p/(1-p))
+logit <- function(p) log(p/(1-p))
 invlogit <- function(x) 1/(1+exp(-x))
 
 # Measurement-scale helpers (loge | log10 | logit) for empirical inputs
@@ -88,11 +88,11 @@ generate_mu <- function(n_years,
     beta0 <- rnorm(1, 0, 0.05)
     return(as.vector(beta0 + Z %*% b))
   }
-  if (mode == "rw")          return(out_rw())
-  if (mode == "ar1")         return(out_ar1())
+  if (mode == "rw") return(out_rw())
+  if (mode == "ar1") return(out_ar1())
   if (mode == "changepoint") return(out_cp())
-  if (mode == "seasonal")    return(out_seas())
-  if (mode == "mixture")     return(replicate(K_guilds, out_rw(), simplify = FALSE))
+  if (mode == "seasonal") return(out_seas())
+  if (mode == "mixture") return(replicate(K_guilds, out_rw(), simplify = FALSE))
 }
 
 # 2) Simulation on the log scale with options + STICKINESS (state-dependent) ####
@@ -119,9 +119,9 @@ simulate_species_data <- function(n_species = 30, n_years = 30, seed = 232680,
                                   # inclusion MNAR
                                   inclusion_bias = list(enabled=FALSE, a0=-0.5, a1=3.0, rho1=1.0, rho0=0.0, p_init=1)) {
   set.seed(seed)
-  dgp_mode  <- match.arg(dgp_mode)
+  dgp_mode <- match.arg(dgp_mode)
   innov_dist<- match.arg(innov_dist)
-  sp_trend  <- match.arg(sp_trend)
+  sp_trend <- match.arg(sp_trend)
   years <- 1:n_years
   
   # Generate mean growth(s) at interval resolution t=1..T-1
@@ -223,21 +223,25 @@ simulate_species_data <- function(n_species = 30, n_years = 30, seed = 232680,
     l_true = l_true,
     # generator truths
     mu_common_true = mu_common_true, # growth truth for plots (log scale)
-    M_common_true  = M_common_true, # cumulative truth (log scale)
+    M_common_true = M_common_true, # cumulative truth (log scale)
     # realised truths (optional overlays)
-    g_mean_true    = g_mean_true,
-    M_realised_true= M_realised_true,
+    g_mean_true = g_mean_true,
+    M_realised_true = M_realised_true,
     # selected-only truths (optional overlays for MNAR diagnostics)
     mu_selected_true = mu_selected_true, # for log-growth
-    M_selected_true  = M_selected_true, # for cumulative M
+    M_selected_true = M_selected_true, # for cumulative M
     lmnar_selected_true = lmnar_selected_true, # for MSI
-    # meta
-    mu_true = if (dgp_mode=="mixture") NULL else mu_true %||% NA,
-    mu_list = if (dgp_mode=="mixture") mu_list else NULL,
+    # metadata
+    mu_true = if(dgp_mode=="mixture") NULL else mu_true %||% NA,
+    mu_list = if(dgp_mode=="mixture") mu_list else NULL,
     guild = guild, delta_true = delta_true, gamma_s = gamma_s,
     innov_dist = innov_dist, df_u = df_u,
-    inclusion_bias = inclusion_bias, use_delta = use_delta,
-    meta = list(dgp_mode = dgp_mode, K_guilds = K_guilds)
+    inclusion_bias = inclusion_bias,
+    use_delta = use_delta,
+    meta = list(dgp_mode = dgp_mode,
+                K_guilds = K_guilds,
+                empirical = FALSE,
+                m_scale = "loge") # reminder that sim implicitly on natural log scale
   )
 }
 
@@ -271,8 +275,8 @@ prepare_jags_data2 <- function(sim, df_mu = 6, obs_var_model = 3) {
   se_obs[obs_has_se == 0L] <- 1.0 # not used when obs_has_se==0
   
   # masks used elsewhere
-  obs_mask   <- ifelse(!is.na(sim$y), 1L, 0L)
-  n_present  <- as.integer(colSums(obs_mask))
+  obs_mask <- ifelse(!is.na(sim$y), 1L, 0L)
+  n_present <- as.integer(colSums(obs_mask))
   
   list(
     nsp = nrow(sim$y), nyears = ncol(sim$y), Z = Z, K = ncol(Z),
@@ -519,13 +523,13 @@ model {
   yc <- y - mean(y)
   sv <- svd(Zc) # Zc = U D V'
   s2 <- sv$d^2 # eigenvalues of Zc'Zc
-  n  <- nrow(Zc)
+  n <- nrow(Zc)
   gcv <- vapply(grid, function(lam) {
     # Smoother S = U diag(s2/(s2+lam)) U'
-    Sy  <- sv$u %*% ( (s2/(s2+lam)) * crossprod(sv$u, yc) )
+    Sy <- sv$u %*% ( (s2/(s2+lam)) * crossprod(sv$u, yc) )
     yhat <- as.vector(Sy + mean(y))
-    rss  <- sum((y - yhat)^2)
-    trS  <- sum(s2/(s2+lam))
+    rss <- sum((y - yhat)^2)
+    trS <- sum(s2/(s2+lam))
     rss / ((n - trS)^2 + 1e-12)
   }, numeric(1))
   grid[which.min(gcv)]
@@ -536,12 +540,12 @@ model {
   # Gmat: draws x (T-1), Z: (T-1) x K (no intercept), ridge on columns of Z
   Zc <- scale(Z, center = TRUE, scale = FALSE)
   ZZ <- crossprod(Zc)
-  P  <- solve(ZZ + diag(lambda, ncol(Zc)), tol = 1e-10)
+  P <- solve(ZZ + diag(lambda, ncol(Zc)), tol = 1e-10)
   Bx <- P %*% t(Zc) # K x (T-1); precompute
   # For each draw: center y, ridge fit b, add back mean
   apply(Gmat, 1, function(y) {
     yc <- y - mean(y)
-    b  <- Bx %*% yc
+    b <- Bx %*% yc
     as.vector(Zc %*% b + mean(y))
   }) |> t() # returns draws x (T-1)
 }
@@ -593,11 +597,11 @@ posthoc_smooth_bayes_geomean <- function(fit, years, impute_all,
   
   list(
     Lambda = posterior_summary(mu_sm), # smoothed log-growth
-    Gexp   = posterior_summary(exp(mu_sm)), # multiplicative growth
-    M      = posterior_summary(M_sm), # cumulative log-growth
-    MSI    = posterior_summary(MSI_sm), # index, baseline t=1
+    Gexp = posterior_summary(exp(mu_sm)), # multiplicative growth
+    M = posterior_summary(M_sm), # cumulative log-growth
+    MSI = posterior_summary(MSI_sm), # index, baseline t=1
     lambda = lam,
-    basis  = basis_used,
+    basis = basis_used,
     impute_all = impute_all
   )
 }
@@ -619,10 +623,10 @@ build_ruppert_basis <- function(t, num_knots = 12, centre = TRUE, rescale01 = TR
 prepare_jags_data_freeman <- function(mat_index, mat_se = NULL, years = NULL,
                                       num_knots = 12,
                                       obs_var_model = NULL, # preferred
-                                      seFromData   = NULL, # legacy
-                                      Y1perfect    = TRUE,
-                                      tiny_tau     = 1e-12,
-                                      m.scale      = c("loge","log10","logit")) { # Note that loge assumes that data already on natural log scale
+                                      seFromData = NULL, # legacy
+                                      Y1perfect = TRUE,
+                                      tiny_tau = 1e-12,
+                                      m.scale = c("loge","log10","logit")) { # Note that loge assumes that data already on natural log scale
   m.scale <- match.arg(m.scale)
   stopifnot(is.matrix(mat_index))
   nsp <- nrow(mat_index); ny <- ncol(mat_index)
@@ -682,10 +686,10 @@ prepare_jags_data_freeman <- function(mat_index, mat_se = NULL, years = NULL,
     # observation components
     obs_var_model = ovm,
     obs_mask = obs_mask,
-    tau_obs  = tau_obs,
+    tau_obs = tau_obs,
     se_present = se_present,
     y1perfect_mask = y1perfect_mask,
-    big_tau  = 1e12,
+    big_tau = 1e12,
     tiny_tau = tiny_tau,
     eps = 1.0e-12,
     # misc
@@ -820,32 +824,111 @@ rhat_report <- function(fit, threshold = 1.01, top_n = 30) {
 }
 
 # 7) Posterior summaries ####
+compute_msi_from_l <- function(l_draws,
+                               m_scale = c("loge","log10","logit")) {
+  m_scale <- match.arg(m_scale)
+  stopifnot(length(dim(l_draws)) == 3)
+  it <- dim(l_draws)[1]
+  nsp <- dim(l_draws)[2]
+  ny <- dim(l_draws)[3]
+  
+  # mean over species at each time, per draw
+  mean_l <- apply(l_draws, c(1, 3), mean, na.rm = TRUE) # it x ny
+  
+  if (m_scale %in% c("loge", "log10")) {
+    # standard MSI: geometric-mean ratio on log scale
+    MSI_draws <- exp(mean_l - mean_l[, 1])
+  } else { # logit: ratio of mean probabilities
+    MSI_draws <- matrix(NA_real_, it, ny)
+    for (i in seq_len(it)) {
+      # l_draws[i,,] is nsp x ny
+      p_st   <- plogis(l_draws[i, , ]) # probabilities
+      mean_p <- colMeans(p_st, na.rm = TRUE) # length ny
+      MSI_draws[i, ] <- mean_p / mean_p[1]
+    }
+  }
+  posterior_summary(MSI_draws)
+}
+
 posterior_summary <- function(arr, probs = c(0.025, 0.5, 0.975)) {
   q <- apply(arr, seq_along(dim(arr))[-1], quantile, probs = probs, na.rm = TRUE)
   list(lower = q[1,, drop=FALSE], median = q[2,, drop=FALSE], upper = q[3,, drop=FALSE])
 }
-extract_summaries_partial <- function(fit) {
+
+extract_summaries_partial <- function(fit,
+                                      m_scale = c("loge","log10","logit")) {
+  m_scale <- match.arg(m_scale)
   s <- fit$BUGSoutput$sims.list
+  
+  MSI <- if (m_scale == "logit") {
+    compute_msi_from_l(s$l, m_scale = "logit")
+  } else {
+    posterior_summary(s$MSI)
+  }
+  
   list(MSI = posterior_summary(s$MSI),
        log_smooth = posterior_summary(s$mu), log_full = posterior_summary(s$mu_full),
        G_smooth = posterior_summary(s$G_smooth), G_full = posterior_summary(s$G_full),
        M_smooth = posterior_summary(s$M_smooth), M_full = posterior_summary(s$M_full))
 }
-extract_summaries_nopool <- function(fit) {
+
+extract_summaries_nopool <- function(fit,
+                                     m_scale = c("loge","log10","logit")) {
+  m_scale <- match.arg(m_scale)
   s <- fit$BUGSoutput$sims.list
+  
+  MSI <- if (m_scale == "logit") {
+    compute_msi_from_l(s$l, m_scale = "logit")
+  } else {
+    posterior_summary(s$MSI)
+  }
+  
   list(MSI = posterior_summary(s$MSI),
        log_smooth = posterior_summary(s$mean_mu), log_full = posterior_summary(s$mean_mu_full), # means across species 
        G_smooth = posterior_summary(s$G_smooth), G_full = posterior_summary(s$G_full),
        M_smooth = posterior_summary(s$M_smooth), M_full = posterior_summary(s$M_full))
 }
-extract_summaries_bayes_geomean <- function(fit) {
+
+extract_summaries_bayes_geomean <- function(fit,
+                                            m_scale = c("loge","log10","logit")) {
+  m_scale <- match.arg(m_scale)
   s <- fit$BUGSoutput$sims.list
+  
+  MSI <- if (m_scale == "logit") {
+    compute_msi_from_l(s$l, m_scale = "logit")
+  } else {
+    posterior_summary(s$MSI)
+  }
+  
   list(MSI = posterior_summary(s$MSI))
 }
-extract_summaries_freeman <- function(fit) {
+
+extract_summaries_freeman <- function(fit,
+                                      m_scale = c("loge","log10","logit")) {
+  m_scale <- match.arg(m_scale)
   s <- fit$BUGSoutput$sims.list
-  list(M = posterior_summary(s$M), Mprime = posterior_summary(s$Mprime), 
-       Lambda = posterior_summary(s$Lambda), Gexp = posterior_summary(s$Gexp))
+  
+  # Existing summaries
+  out <- list(
+    M      = posterior_summary(s$M),
+    Mprime = posterior_summary(s$Mprime),
+    Lambda = posterior_summary(s$Lambda),
+    Gexp   = posterior_summary(s$Gexp)
+  )
+  
+  # Add MSI
+  if (!is.null(s$spindex)) {
+    out$MSI <- if (m_scale == "logit") {
+      compute_msi_from_l(s$spindex, m_scale = "logit")
+    } else {
+      # current behaviour: exp(Mprime - Mprime[1])
+      Mdraws <- s$Mprime  # iters x T
+      MSI_draws <- exp(Mdraws - Mdraws[, 1])
+      posterior_summary(MSI_draws)
+    }
+  }
+  
+  out
 }
 
 # 8) Plotting ####
@@ -1044,7 +1127,8 @@ as_sim_from_empirical <- function(index_mat, se_mat = NULL, years = NULL,
     inclusion_bias = list(enabled = FALSE),
     I = matrix(1L, nsp, ny),
     use_delta = FALSE,
-    meta = list(empirical = TRUE)
+    meta = list(empirical = TRUE,
+                m_scale = m.scale) # original scale flag
   )
 }
 
@@ -1059,10 +1143,12 @@ run_full_analysis <- function(data_source = c("simulate","empirical"),
                               jags_nopool  = list(df_mu = 6, obs_var_model = 3, n_iter = 4000, n_burn = 1000, n_chains = 3, n_thin = 5),
                               jags_freeman = list(obs_var_model = 3, n_iter = 4000, n_burnin = 1000, n_chains = 3, n_thin = 5, seed = NULL),
                               jags_bayes_geomean = list(obs_var_model = 3, n_iter = 4000, n_burn = 1000, n_chains = 3, n_thin = 5),
-                              smooth_geomean = list(enable = TRUE, prefer_freeman_basis = TRUE),
+                              smooth_geomean = list(enable = TRUE, 
+                                                    prefer_freeman_basis = TRUE),
                               plot_geomean = TRUE, impute_all_geomean = TRUE,
                               plot_MNAR = TRUE,
-                              brc_opts = list(num_knots = 12, seFromData = FALSE, Y1perfect = TRUE, m.scale = "loge"),
+                              brc_opts = list(num_knots = 12, seFromData = FALSE, 
+                                              Y1perfect = TRUE, m.scale = "loge"),
                               growth_scale = c("log", "exp")) {
   data_source <- match.arg(data_source)
   if (data_source == "simulate") {
@@ -1076,6 +1162,7 @@ run_full_analysis <- function(data_source = c("simulate","empirical"),
     sim <- as_sim_from_empirical(empirical_index_mat, empirical_se_mat, empirical_years, m.scale = empirical_m_scale)
   }
   
+  m_scale <- sim$meta$m_scale %||% "loge"
   results <- list(); fits <- list(); checks <- list()
   
   # Partial
@@ -1085,7 +1172,7 @@ run_full_analysis <- function(data_source = c("simulate","empirical"),
                                  n_chains = jags_partial$n_chains %||% 3, n_thin = jags_partial$n_thin %||% 2)
     fits$partial <- fit
     checks$partial <- rhat_report(fit)
-    results$partial <- extract_summaries_partial(fit)
+    results$partial <- extract_summaries_partial(fit, m_scale = m_scale)
   }
   
   # No pool
@@ -1095,26 +1182,7 @@ run_full_analysis <- function(data_source = c("simulate","empirical"),
                                  n_chains = jags_nopool$n_chains %||% 3, n_thin = jags_nopool$n_thin %||% 5)
     fits$nopool <- fit
     checks$nopool <- rhat_report(fit)
-    results$nopool <- extract_summaries_nopool(fit)
-  }
-  
-  # Freeman (BRC)
-  if ("freeman" %in% fit_models) {
-    # choose option: prefer explicit brc_opts$obs_var_model, else map seFromData -> {2,4}
-    freeman_ovm <- jags_freeman$obs_var_model %||% if (isTRUE(brc_opts$seFromData)) 2L else 4L
-    
-    dat <- prepare_jags_data_freeman(sim$y, sim$se,
-                                     years = sim$years,
-                                     num_knots = brc_opts$num_knots %||% 12,
-                                     obs_var_model = freeman_ovm,
-                                     Y1perfect = brc_opts$Y1perfect %||% TRUE,
-                                     m.scale = brc_opts$m.scale %||% "loge")
-    fit <- run_freeman_brc(dat, n_iter = jags_freeman$n_iter %||% 4000, n_burnin = jags_freeman$n_burnin %||% 1000,
-                           n_chains = jags_freeman$n_chains %||% 3, n_thin = jags_freeman$n_thin %||% 5,
-                           seed = jags_freeman$seed %||% NULL)
-    fits$freeman <- fit
-    checks$freeman <- rhat_report(fit)
-    results$freeman <- extract_summaries_freeman(fit)
+    results$nopool <- extract_summaries_nopool(fit, m_scale = m_scale)
   }
   
   # Bayesian geomean (no pooling across species beyond averaging; no time model)
@@ -1125,7 +1193,8 @@ run_full_analysis <- function(data_source = c("simulate","empirical"),
                              impute_all = impute_all_geomean, nu_rw = NULL)
     fits$bayes_geomean <- fit
     checks$bayes_geomean <- rhat_report(fit)
-    results$bayes_geomean <- extract_summaries_bayes_geomean(fit)
+    results$bayes_geomean <- extract_summaries_bayes_geomean(fit, m_scale = m_scale)
+    
     # smooth Bayesian geomean
     if (isTRUE(smooth_geomean$enable)) {
       want_ruppert <- isTRUE(smooth_geomean$prefer_freeman_basis) && ("freeman" %in% fit_models)
@@ -1142,30 +1211,70 @@ run_full_analysis <- function(data_source = c("simulate","empirical"),
     }
   }
   
+  # Freeman (BRC)
+  if ("freeman" %in% fit_models) {
+    # choose option: prefer explicit brc_opts$obs_var_model, else map seFromData -> {2,4}
+    freeman_ovm <- jags_freeman$obs_var_model %||% if (isTRUE(brc_opts$seFromData)) 2L else 4L
+    
+    if (data_source == "simulate") {
+      dat <- prepare_jags_data_freeman(sim$y, sim$se,
+                                       years = sim$years,
+                                       num_knots = brc_opts$num_knots %||% 12,
+                                       obs_var_model = freeman_ovm,
+                                       Y1perfect = brc_opts$Y1perfect %||% TRUE,
+                                       m.scale = "loge")
+    } else { # empirical
+      dat <- prepare_jags_data_freeman(empirical_index_mat, empirical_se_mat,
+                                       years = empirical_years,
+                                       num_knots = brc_opts$num_knots %||% 12,
+                                       obs_var_model = freeman_ovm,
+                                       Y1perfect = brc_opts$Y1perfect %||% TRUE,
+                                       m.scale = empirical_m_scale)
+    }
+    
+    fit <- run_freeman_brc(dat, n_iter = jags_freeman$n_iter %||% 4000, n_burnin = jags_freeman$n_burnin %||% 1000,
+                           n_chains = jags_freeman$n_chains %||% 3, n_thin = jags_freeman$n_thin %||% 5,
+                           seed = jags_freeman$seed %||% NULL)
+    fits$freeman <- fit
+    checks$freeman <- rhat_report(fit)
+    results$freeman <- extract_summaries_freeman(fit, m_scale = m_scale)
+  }
+  
   ## Plots ####
   growth_scale <- match.arg(growth_scale)
   plots <- list()
   
   ## MSI ####
   MSI_list <- list()
+  
   if (!is.null(results$partial)) MSI_list$Partial <- results$partial$MSI
   if (!is.null(results$nopool))  MSI_list$Nopool  <- results$nopool$MSI
+  
   if (!is.null(results$bayes_geomean) && isTRUE(plot_geomean)) MSI_list$BayesGeomean <- results$bayes_geomean$MSI
   if (!is.null(results$bayes_geomean_smooth)) MSI_list$BayesGeomean_S <- results$bayes_geomean_smooth$MSI
+  
+  ## Below now in extract_summaries_freeman()
+  # if (!is.null(results$freeman)) {
+  #   if (!is.null(fits$freeman$BUGSoutput$sims.list$Mprime)) {
+  #     Mdraws <- fits$freeman$BUGSoutput$sims.list$Mprime # iters x T
+  #     MSI_draws <- exp(Mdraws - Mdraws[, 1])
+  #     MSI_list$Freeman <- posterior_summary(MSI_draws)
+  #   } else {
+  #     Mpr <- results$freeman$Mprime
+  #     MSI_list$Freeman <- list(
+  #       lower  = exp(Mpr$lower - Mpr$lower[1]),
+  #       median = exp(Mpr$median - Mpr$median[1]),
+  #       upper  = exp(Mpr$upper - Mpr$upper[1])
+  #     )
+  #   }
+  # }
+  
   if (!is.null(results$freeman)) {
-    if (!is.null(fits$freeman$BUGSoutput$sims.list$Mprime)) {
-      Mdraws <- fits$freeman$BUGSoutput$sims.list$Mprime # iters x T
-      MSI_draws <- exp(Mdraws - Mdraws[, 1])
-      MSI_list$Freeman <- posterior_summary(MSI_draws)
-    } else {
-      Mpr <- results$freeman$Mprime
-      MSI_list$Freeman <- list(
-        lower  = exp(Mpr$lower - Mpr$lower[1]),
-        median = exp(Mpr$median - Mpr$median[1]),
-        upper  = exp(Mpr$upper - Mpr$upper[1])
-      )
+    if (!is.null(results$freeman$MSI)) {
+      MSI_list$Freeman <- results$freeman$MSI
     }
   }
+  
   truth_idx <- NULL
   if (!is.null(sim$l_true)) {
     Lbar <- colMeans(sim$l_true)
@@ -1302,11 +1411,11 @@ evaluate_inclusion_process <- function(sim, verbose = TRUE) {
   
   years_idx <- 2:nY
   T1 <- nY - 1
-  cor_t   <- rep(NA_real_, T1)
+  cor_t <- rep(NA_real_, T1)
   n_pairs <- integer(T1)
-  sd_Iv   <- rep(NA_real_, T1)
-  sd_rv   <- rep(NA_real_, T1)
-  reason  <- rep(NA_character_, T1)
+  sd_Iv <- rep(NA_real_, T1)
+  sd_rv <- rep(NA_real_, T1)
+  reason <- rep(NA_character_, T1)
   
   for (tt in seq_len(T1)) {
     t <- years_idx[tt]
@@ -1344,11 +1453,11 @@ evaluate_inclusion_process <- function(sim, verbose = TRUE) {
   }
   
   diag_df <- data.frame(
-    year   = years_idx,
+    year = years_idx,
     n_pairs = n_pairs,
-    sd_I    = sd_Iv,
-    sd_r    = sd_rv,
-    reason  = reason,
+    sd_I = sd_Iv,
+    sd_r = sd_rv,
+    reason = reason,
     stringsAsFactors = FALSE
   )
   
@@ -1381,75 +1490,72 @@ evaluate_inclusion_process <- function(sim, verbose = TRUE) {
 }
 
 # 11) Example usage ####
-# sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
-#                  ## Growth rate DGP
-#                  dgp_mode = "spline", # "spline","rw","ar1","changepoint","seasonal","mixture"
-#                  ## DGP options
-#                  # spline options
-#                  df_mu = 6, # default
-#                  # RW / AR1
-#                  sigma_eta = 0.05, phi = 0.7,
-#                  # changepoint
-#                  n_cp = 2, jump_sd = 0.15, piecewise_linear = FALSE,
-#                  # seasonal
-#                  A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
-#                  # mixture of random walks
-#                  K_guilds = 5, # number of groups
-#                  ## Simulate species options
-#                  # species/state variation
-#                  sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
-#                  innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t)
-#                  sp_trend = "none", sigma_gamma = 0.05, log_sd_se = 0.35, # "none" or "random_slope"
-#                  use_delta = FALSE, # cross-species annual shocks?
-#                  # observation model
-#                  sigma_obs_mean = 0.02, prop_missing = 0,
-#                  # Inclusion MNAR (additional to prop_missing)
-#                  inclusion_bias = list(enabled=F, # include inclusion bias?
-#                                        a0=-0.4, 
-#                                        a1=3.0,
-#                                        rho1=1.2,
-#                                        rho0=0.2,
-#                                        p_init=1))
-# out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
-#                          sim_args = sim_args, # as above
-#                          fit_models = c("partial","freeman", "nopool","bayes_geomean"),
-#                          #fit_models = c("partial","freeman","bayes_geomean"),
-#                          #fit_models = c("partial","freeman", "nopool"),
-#                          #fit_models = c("partial"),
-#                          #fit_models = c("freeman"),
-#                          #fit_models = c("freeman","bayes_geomean"),
-#                          #fit_models = c("bayes_geomean"),
-#                          ## Model-specific settings
-#                          jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-#                          jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-#                          jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
-#                          jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
-#                          smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
-#                          plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
-#                          # impute missing spp/year combinations
-#                          impute_all_geomean = T, # if false, then under MNAR the estimand differs from other models
-#                          plot_MNAR = TRUE, # plot sampled species "truth" alongside actual truth
-#                          ## Cross-model settings
-#                          # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
-#                          # but only if obs_var_model not specified
-#                          # m.scale = loge assumes data already on natural log scale
-#                          brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE, m.scale = "loge"),
-#                          ## Growth-rate presentation scale (model returns both anyway, this is for plot)
-#                          growth_scale = "log")
-# # Convergence report
-# out$checks
-# # Plots
-# print(out$plots$MSI) # M_prime equivalents
-# print(out$plots$CumLog) # M equivalents where applicable
-# print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
-# # Inclusion diagnostics
-# evaluate_inclusion_process(out$sim, verbose = TRUE)
+sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
+                 ## Growth rate DGP
+                 dgp_mode = "spline", # "spline","rw","ar1","changepoint","seasonal","mixture"
+                 ## DGP options
+                 # spline options
+                 df_mu = 6, # default
+                 # RW / AR1
+                 sigma_eta = 0.05, phi = 0.7,
+                 # changepoint
+                 n_cp = 2, jump_sd = 0.15, piecewise_linear = FALSE,
+                 # seasonal
+                 A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
+                 # mixture of random walks
+                 K_guilds = 5, # number of groups
+                 ## Simulate species options
+                 # species/state variation
+                 sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
+                 innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t)
+                 sp_trend = "none", sigma_gamma = 0.05, log_sd_se = 0.35, # "none" or "random_slope"
+                 use_delta = FALSE, # cross-species annual shocks?
+                 # observation model
+                 sigma_obs_mean = 0.02, prop_missing = 0,
+                 # Inclusion MNAR (additional to prop_missing)
+                 inclusion_bias = list(enabled=F, # include inclusion bias?
+                                       a0=-0.4,
+                                       a1=3.0,
+                                       rho1=1.2,
+                                       rho0=0.2,
+                                       p_init=1))
+out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
+                         sim_args = sim_args, # as above
+                         fit_models = c("partial","freeman", "nopool","bayes_geomean"),
+                         #fit_models = c("partial","freeman","bayes_geomean"),
+                         #fit_models = c("partial","freeman", "nopool"),
+                         #fit_models = c("partial"),
+                         #fit_models = c("freeman"),
+                         #fit_models = c("freeman","bayes_geomean"),
+                         #fit_models = c("bayes_geomean"),
+                         ## Model-specific settings
+                         jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+                         jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+                         jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
+                         jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
+                         smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
+                         plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
+                         # impute missing spp/year combinations
+                         impute_all_geomean = T, # if false, then under MNAR the estimand differs from other models
+                         plot_MNAR = TRUE, # plot sampled species "truth" alongside actual truth
+                         ## Cross-model settings
+                         # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
+                         # but only if obs_var_model not specified
+                         # m.scale = loge assumes data already on natural log scale
+                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE, m.scale = "loge"),
+                         ## Growth-rate presentation scale (model returns both anyway, this is for plot)
+                         growth_scale = "log")
+# Convergence report
+out$checks
+# Plots
+print(out$plots$MSI) # M_prime equivalents
+print(out$plots$CumLog) # M equivalents where applicable
+print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
+# Inclusion diagnostics
+evaluate_inclusion_process(out$sim, verbose = TRUE)
 
 #### TO DO ####
-## Fix back-transformation of logit-scale empirical data (currently uses exp(), which results in different estimand)
 ## Shrinkage evaluation!
 ## Visualise (sample of) species' trends
-
-# Ronaldo <- "GOAT"
 
 # End of file #

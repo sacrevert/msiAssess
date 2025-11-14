@@ -1425,9 +1425,9 @@ evaluate_inclusion_process <- function(sim, verbose = TRUE) {
     } else if (ncol(r_mat) == T1 && nrow(r_mat) == nrow(I)) {
       as.numeric(r_mat[, tt])
     } else {
-      stop("r_mat must be (T-1)×S or S×(T-1); got ",
-           paste(dim(r_mat), collapse = "×"), " vs I dims ",
-           paste(dim(I), collapse = "×"))
+      stop("r_mat must be (T-1) x S or S x (T-1); got ",
+           paste(dim(r_mat), collapse = "x"), " vs I dims ",
+           paste(dim(I), collapse = "x"))
     }
     I_t <- as.numeric(I[, t])
     ok <- is.finite(I_t) & is.finite(r_t)
@@ -1468,9 +1468,9 @@ evaluate_inclusion_process <- function(sim, verbose = TRUE) {
     freq <- table(factor(reason, levels = lvl))
     # keep nonzero only
     freq <- freq[freq > 0]
-    top <- if (length(freq)) paste(paste0(names(freq), "×", as.integer(freq)), collapse = ", ") else "no classified reason"
+    top <- if (length(freq)) paste(paste0(names(freq), "x", as.integer(freq)), collapse = ", ") else "no classified reason"
     note <- paste0(
-      "All annual selection–growth correlations are NA for T-1 = ", T1, ". ",
+      "All annual selection-growth correlations are NA for T-1 = ", T1, ". ",
       "This is expected when inclusion or growth lacks cross-species variation (e.g., inclusion all 1s). ",
       "Reason summary: [", top, "]. Source of r: ", r_src, "."
     )
@@ -1557,5 +1557,6 @@ evaluate_inclusion_process(out$sim, verbose = TRUE)
 #### TO DO ####
 ## Shrinkage evaluation!
 ## Visualise (sample of) species' trends
+
 
 # End of file #

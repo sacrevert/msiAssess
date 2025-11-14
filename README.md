@@ -98,48 +98,9 @@ out <- run_full_analysis(data_source = "simulate", # simulated data or empirical
                          # but only if obs_var_model not specified
                          brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE, m.scale = "loge"),
                          ## Growth-rate presentation scale (model returns both anyway, this is for plot)
-                         growth_scale = "log")
+                         growth_scale = "log",
+                         quiet = TRUE) # suppress JAGS output here 
 ```
-
-    Compiling model graph
-       Resolving undeclared variables
-       Allocating nodes
-    Graph information:
-       Observed stochastic nodes: 1200
-       Unobserved stochastic nodes: 1241
-       Total graph size: 25758
-
-    Initializing model
-
-    Compiling model graph
-       Resolving undeclared variables
-       Allocating nodes
-    Graph information:
-       Observed stochastic nodes: 1200
-       Unobserved stochastic nodes: 1562
-       Total graph size: 28544
-
-    Initializing model
-
-    Compiling model graph
-       Resolving undeclared variables
-       Allocating nodes
-    Graph information:
-       Observed stochastic nodes: 1200
-       Unobserved stochastic nodes: 1283
-       Total graph size: 25429
-
-    Initializing model
-
-    Compiling model graph
-       Resolving undeclared variables
-       Allocating nodes
-    Graph information:
-       Observed stochastic nodes: 1200
-       Unobserved stochastic nodes: 1218
-       Total graph size: 33363
-
-    Initializing model
 
 Note that in this example we are just running very short chains, and so
 it won’t be surprising if we don’t have satisfactory convergence

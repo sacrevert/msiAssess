@@ -782,20 +782,21 @@ model {
 }
 ")
 
-run_freeman_brc <- function(data_list, n_iter = 4000, n_burnin = 1000, n_chains = 3, n_thin = 5, seed = NULL) {
+run_freeman_brc <- function(data_list, n_iter = 4000, n_burnin = 1000, n_chains = 3, n_thin = 5, seed = NULL, quiet = FALSE) {
   if (!is.null(seed)) set.seed(seed)
   R2jags::jags(
     data = data_list,
     parameters.to.save = c("beta","b","taub","sigma_spi","theta","Lambda","Gexp",
                            "M","Mprime","spindex","g"),
     model.file = textConnection(freeman_brc_model),
-    n.chains = n_chains, n.iter = n_iter, n.burnin = n_burnin, n.thin = n_thin
+    n.chains = n_chains, n.iter = n_iter, n.burnin = n_burnin, n.thin = n_thin, 
+    quiet = quiet
   )
 }
 
 # 6) Fit wrappers and convergence checks ####
 fit_partial_or_nopool <- function(model = c("partial","nopool"), data_list,
-                                  n_iter = 4000, n_burn = 1000, n_chains = 3, n_thin = 5) {
+                                  n_iter = 4000, n_burn = 1000, n_chains = 3, n_thin = 5, quiet = FALSE) {
   model <- match.arg(model)
   model_string <- if (model=="partial") jags_partial else jags_nopool
   params <- if (model=="partial") c("l","delta","G_smooth","G_full","M_smooth","M_full","MSI","mu","mu_full",
@@ -803,17 +804,17 @@ fit_partial_or_nopool <- function(model = c("partial","nopool"), data_list,
   else c("l","G_smooth","G_full","M_smooth","M_full","MSI","mean_mu","mean_mu_full",
          "sigma_b","b","beta0","c","theta","sigma_sp")
   jags(data = data_list, parameters.to.save = params, model.file = textConnection(model_string),
-       n.chains = n_chains, n.iter = n_iter, n.burnin = n_burn, n.thin = n_thin)
+       n.chains = n_chains, n.iter = n_iter, n.burnin = n_burn, n.thin = n_thin, quiet = quiet)
 }
 
 fit_bayes_geomean <- function(data_list, n_iter = 4000, n_burn = 1000, n_chains = 3, n_thin = 5,
-                              impute_all = TRUE, nu_rw = NULL) {
+                              impute_all = TRUE, nu_rw = NULL, quiet = FALSE) {
   model_string <- if (isTRUE(impute_all)) jags_bayes_geomean_impute else jags_bayes_geomean
   if (!is.null(nu_rw)) data_list$nu_rw <- nu_rw
   jags(data = data_list,
        parameters.to.save = c("MSI","l","theta","c", "Lbar", "mean_logI"), # keep l for diagnostics
        model.file = textConnection(model_string),
-       n.chains = n_chains, n.iter = n_iter, n.burnin = n_burn, n.thin = n_thin)
+       n.chains = n_chains, n.iter = n_iter, n.burnin = n_burn, n.thin = n_thin, quiet = quiet)
 }
 
 rhat_report <- function(fit, threshold = 1.01, top_n = 30) {
@@ -1149,7 +1150,8 @@ run_full_analysis <- function(data_source = c("simulate","empirical"),
                               plot_MNAR = TRUE,
                               brc_opts = list(num_knots = 12, seFromData = FALSE, 
                                               Y1perfect = TRUE, m.scale = "loge"),
-                              growth_scale = c("log", "exp")) {
+                              growth_scale = c("log", "exp"),
+                              quiet = FALSE) {
   data_source <- match.arg(data_source)
   if (data_source == "simulate") {
     sim <- do.call(simulate_species_data, sim_args)
@@ -1169,7 +1171,7 @@ run_full_analysis <- function(data_source = c("simulate","empirical"),
   if ("partial" %in% fit_models) {
     dl <- prepare_jags_data2(sim, df_mu = jags_partial$df_mu %||% 6, obs_var_model = jags_partial$obs_var_model %||% 3)
     fit <- fit_partial_or_nopool("partial", dl, n_iter = jags_partial$n_iter %||% 4000, n_burn = jags_partial$n_burn %||% 1000,
-                                 n_chains = jags_partial$n_chains %||% 3, n_thin = jags_partial$n_thin %||% 2)
+                                 n_chains = jags_partial$n_chains %||% 3, n_thin = jags_partial$n_thin %||% 2, quiet = quiet)
     fits$partial <- fit
     checks$partial <- rhat_report(fit)
     results$partial <- extract_summaries_partial(fit, m_scale = m_scale)
@@ -1179,7 +1181,7 @@ run_full_analysis <- function(data_source = c("simulate","empirical"),
   if ("nopool" %in% fit_models) {
     dl <- prepare_jags_data2(sim, df_mu = jags_nopool$df_mu %||% 6, obs_var_model = jags_nopool$obs_var_model %||% 3)
     fit <- fit_partial_or_nopool("nopool", dl, n_iter = jags_nopool$n_iter %||% 4000, n_burn = jags_nopool$n_burn %||% 1000,
-                                 n_chains = jags_nopool$n_chains %||% 3, n_thin = jags_nopool$n_thin %||% 5)
+                                 n_chains = jags_nopool$n_chains %||% 3, n_thin = jags_nopool$n_thin %||% 5, quiet = quiet)
     fits$nopool <- fit
     checks$nopool <- rhat_report(fit)
     results$nopool <- extract_summaries_nopool(fit, m_scale = m_scale)
@@ -1190,7 +1192,7 @@ run_full_analysis <- function(data_source = c("simulate","empirical"),
     dl <- prepare_jags_data2(sim, df_mu = 6, obs_var_model = jags_bayes_geomean$obs_var_model %||% 4)
     fit <- fit_bayes_geomean(dl, n_iter = jags_bayes_geomean$n_iter %||% 4000, n_burn = jags_bayes_geomean$n_burn %||% 1000,
                              n_chains = jags_bayes_geomean$n_chains %||% 3, n_thin = jags_bayes_geomean$n_thin %||% 5,
-                             impute_all = impute_all_geomean, nu_rw = NULL)
+                             impute_all = impute_all_geomean, nu_rw = NULL, quiet = quiet)
     fits$bayes_geomean <- fit
     checks$bayes_geomean <- rhat_report(fit)
     results$bayes_geomean <- extract_summaries_bayes_geomean(fit, m_scale = m_scale)
@@ -1234,7 +1236,7 @@ run_full_analysis <- function(data_source = c("simulate","empirical"),
     
     fit <- run_freeman_brc(dat, n_iter = jags_freeman$n_iter %||% 4000, n_burnin = jags_freeman$n_burnin %||% 1000,
                            n_chains = jags_freeman$n_chains %||% 3, n_thin = jags_freeman$n_thin %||% 5,
-                           seed = jags_freeman$seed %||% NULL)
+                           seed = jags_freeman$seed %||% NULL, quiet = quiet)
     fits$freeman <- fit
     checks$freeman <- rhat_report(fit)
     results$freeman <- extract_summaries_freeman(fit, m_scale = m_scale)
@@ -1633,75 +1635,76 @@ plot_species_trends <- function(out, # only observed plotted if "sim" is actuall
 }
 
 # 12) Example usage ####
-# sim_args <- list(n_species = 100, n_years = 30, seed = 232680,
-#                  ## Growth rate DGP
-#                  dgp_mode = "mixture", # "spline","rw","ar1","changepoint","seasonal","mixture"
-#                  ## DGP options
-#                  # spline options
-#                  df_mu = 6, # default
-#                  # RW / AR1
-#                  sigma_eta = 0.05, phi = 0.7,
-#                  # changepoint
-#                  n_cp = 2, jump_sd = 0.15, piecewise_linear = FALSE,
-#                  # seasonal
-#                  A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
-#                  # mixture of random walks
-#                  K_guilds = 5, # number of groups
-#                  ## Simulate species options
-#                  # species/state variation
-#                  sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
-#                  innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t)
-#                  sp_trend = "random_slope", sigma_gamma = 0.075, log_sd_se = 0.35, # "none" or "random_slope"
-#                  use_delta = FALSE, # cross-species annual shocks?
-#                  # observation model
-#                  sigma_obs_mean = 0.025, prop_missing = 0.7,
-#                  # Inclusion MNAR (additional to prop_missing)
-#                  inclusion_bias = list(enabled = T, # include inclusion bias?
-#                                        a0 = -0.4,
-#                                        a1 = 3.0,
-#                                        rho1 = 1.2,
-#                                        rho0 = 0.2,
-#                                        p_init = 0.2))
-# out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
-#                          sim_args = sim_args, # as above
-#                          #fit_models = c("partial","freeman", "nopool","bayes_geomean"),
-#                          fit_models = c("partial","freeman","bayes_geomean"),
-#                          #fit_models = c("partial","freeman", "nopool"),
-#                          #fit_models = c("partial"),
-#                          #fit_models = c("freeman"),
-#                          #fit_models = c("freeman","bayes_geomean"),
-#                          #fit_models = c("bayes_geomean"),
-#                          ## Model-specific settings
-#                          jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-#                          jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-#                          jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
-#                          jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
-#                          smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
-#                          plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
-#                          # impute missing spp/year combinations
-#                          impute_all_geomean = T, # if false, then under MNAR the estimand differs from other models
-#                          plot_MNAR = TRUE, # plot sampled species "truth" alongside actual truth
-#                          ## Cross-model settings
-#                          # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
-#                          # but only if obs_var_model not specified
-#                          # m.scale = loge assumes data already on natural log scale
-#                          brc_opts = list(num_knots = 12, seFromData = TRUE, 
-#                                          Y1perfect = FALSE, m.scale = "loge"),
-#                          ## Growth-rate presentation scale (model returns both anyway, this is for plot)
-#                          growth_scale = "log")
-# ## Convergence report
-# out$checks
-# ## Plots
-# print(out$plots$MSI) # M_prime equivalents
-# print(out$plots$CumLog) # M equivalents where applicable
-# print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
-# ## Inclusion diagnostics
-# evaluate_inclusion_process(out$sim)
-# ## Spp trends (grey line = latent process; blue dot = noisy obs with missingness
-# # Plot 12 randomly chosen species on log scale
-# plot_species_trends(out, n_sample = 12, scale = "log")
-# # Plot specific species (by index) as baseline-1 indices
-# plot_species_trends(out, species = c(1,5,9), scale = "index")
+sim_args <- list(n_species = 100, n_years = 30, seed = 232680,
+                 ## Growth rate DGP
+                 dgp_mode = "mixture", # "spline","rw","ar1","changepoint","seasonal","mixture"
+                 ## DGP options
+                 # spline options
+                 df_mu = 6, # default
+                 # RW / AR1
+                 sigma_eta = 0.05, phi = 0.7,
+                 # changepoint
+                 n_cp = 2, jump_sd = 0.15, piecewise_linear = FALSE,
+                 # seasonal
+                 A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
+                 # mixture of random walks
+                 K_guilds = 5, # number of groups
+                 ## Simulate species options
+                 # species/state variation
+                 sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
+                 innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t)
+                 sp_trend = "random_slope", sigma_gamma = 0.075, log_sd_se = 0.35, # "none" or "random_slope"
+                 use_delta = FALSE, # cross-species annual shocks?
+                 # observation model
+                 sigma_obs_mean = 0.025, prop_missing = 0.7,
+                 # Inclusion MNAR (additional to prop_missing)
+                 inclusion_bias = list(enabled = T, # include inclusion bias?
+                                       a0 = -0.4,
+                                       a1 = 3.0,
+                                       rho1 = 1.2,
+                                       rho0 = 0.2,
+                                       p_init = 0.2))
+out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
+                         sim_args = sim_args, # as above
+                         #fit_models = c("partial","freeman", "nopool","bayes_geomean"),
+                         fit_models = c("partial","freeman","bayes_geomean"),
+                         #fit_models = c("partial","freeman", "nopool"),
+                         #fit_models = c("partial"),
+                         #fit_models = c("freeman"),
+                         #fit_models = c("freeman","bayes_geomean"),
+                         #fit_models = c("bayes_geomean"),
+                         ## Model-specific settings
+                         jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+                         jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+                         jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
+                         jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
+                         smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
+                         plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
+                         # impute missing spp/year combinations
+                         impute_all_geomean = T, # if false, then under MNAR the estimand differs from other models
+                         plot_MNAR = TRUE, # plot sampled species "truth" alongside actual truth
+                         ## Cross-model settings
+                         # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
+                         # but only if obs_var_model not specified
+                         # m.scale = loge assumes data already on natural log scale
+                         brc_opts = list(num_knots = 12, seFromData = TRUE,
+                                         Y1perfect = FALSE, m.scale = "loge"),
+                         ## Growth-rate presentation scale (model returns both anyway, this is for plot)
+                         growth_scale = "log",
+                         quiet = FALSE) # suppress JAGS output
+## Convergence report
+out$checks
+## Plots
+print(out$plots$MSI) # M_prime equivalents
+print(out$plots$CumLog) # M equivalents where applicable
+print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
+## Inclusion diagnostics
+evaluate_inclusion_process(out$sim)
+## Spp trends (grey line = latent process; blue dot = noisy obs with missingness
+# Plot 12 randomly chosen species on log scale
+plot_species_trends(out, n_sample = 12, scale = "log")
+# Plot specific species (by index) as baseline-1 indices
+plot_species_trends(out, species = c(1,5,9), scale = "index")
 
 #### TO DO ####
 ## Shrinkage evaluation!

@@ -9,11 +9,11 @@ msiAssess
 
 msiAssess allows the user to fit a set of Bayesian models for
 multi-species (biodiversity) indicators to both simulated and empirical
-data. The models will be explained in detail in the coming months, but
-include a version of the Freeman’s “generic method” ([S. N. Freeman et
-al., 2021](#ref-freemanGenericMethod2021)) that allows for variably
-observed species’ index standard errors, and a Bayesian version of
-Soldaat’s Monte Carlo method ([L. L. Soldaat et al.,
+data. The models will be explained in detail elsewhere, but include a
+version of the Freeman’s “generic method” ([S. N. Freeman et al.,
+2021](#ref-freemanGenericMethod2021)) that allows for variably observed
+species’ index standard errors, and a Bayesian version of Soldaat’s
+Monte Carlo method ([L. L. Soldaat et al.,
 2017](#ref-soldaatMonteCarlo2017)) with user-controlled in-model
 imputation of missing data. Two novel Bayesian model types (“no pooling”
 and “partial pooling” models of growth-rates with common annual
@@ -160,6 +160,7 @@ head(out$checks$freeman$bad) # all models are included at out$checks level
     NULL
 
 ``` r
+# Indicator plots
 print(out$plots$MSI) # M_prime equivalents
 ```
 
@@ -179,7 +180,7 @@ print(out$plots$Growth) # annual growth on scale specified in run_full_analysis(
 
 ``` r
 # Inclusion diagnostics (e.g. for comparing MNAR strength to empirical examples)
-evaluate_inclusion_process(out$sim, verbose = TRUE)
+evaluate_inclusion_process(out$sim)
 ```
 
     $transition
@@ -249,19 +250,19 @@ evaluate_inclusion_process(out$sim, verbose = TRUE)
     29   30      40    0    0 no_variation_both
 
     $note
-    [1] "All annual selection-growth correlations are NA for T-1 = 29. This is expected when inclusion or growth lacks cross-species variation (e.g., inclusion all 1s). Reason summary: [no_variation_bothx29]. Source of r: mu_true + delta_true (+ gamma_s)."
+    [1] "All annual selection growth correlations are NA for T-1 = 29. This is expected when inclusion or growth lacks cross-species variation (e.g., inclusion all 1s). Reason summary: [no_variation_bothx29]. Source of r: mu_true + delta_true (+ gamma_s)."
 
 ``` r
-## Spp trends (grey lin = latent process; blue dot = (noisy) observations
+## Spp trends (grey line = latent process; blue dot = noisy obs with missingness
 # Plot 12 randomly chosen species on log scale
-print(plot_species_trends(out, n_sample = 12, scale = "log"))
+plot_species_trends(out, n_sample = 12, scale = "log")
 ```
 
 <img src="README_files/figure-gfm/unnamed-chunk-4-4.png" style="display: block; margin: auto;" />
 
 ``` r
 # Plot specific species (by index) as baseline-1 indices
-print(plot_species_trends(out, species = c(1, 5, 9), scale = "index"))
+plot_species_trends(out, species = c(1, 5, 9), scale = "index")
 ```
 
 <img src="README_files/figure-gfm/unnamed-chunk-4-5.png" style="display: block; margin: auto;" />

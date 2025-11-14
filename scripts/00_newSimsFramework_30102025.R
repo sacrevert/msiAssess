@@ -1386,7 +1386,7 @@ burstiness_index <- function(x) {
   (s - m) / (s + m)
 }
 
-evaluate_inclusion_process <- function(sim, verbose = TRUE) {
+evaluate_inclusion_process <- function(sim) {
   stopifnot(!is.null(sim$I))
   I <- sim$I
   trans <- transition_probs(I)
@@ -1470,11 +1470,11 @@ evaluate_inclusion_process <- function(sim, verbose = TRUE) {
     freq <- freq[freq > 0]
     top <- if (length(freq)) paste(paste0(names(freq), "x", as.integer(freq)), collapse = ", ") else "no classified reason"
     note <- paste0(
-      "All annual selection-growth correlations are NA for T-1 = ", T1, ". ",
+      "All annual selection growth correlations are NA for T-1 = ", T1, ". ",
       "This is expected when inclusion or growth lacks cross-species variation (e.g., inclusion all 1s). ",
       "Reason summary: [", top, "]. Source of r: ", r_src, "."
     )
-    if (isTRUE(verbose)) message(note)
+    #if (isTRUE(verbose)) message(note)
   }
   
   list(
@@ -1559,7 +1559,7 @@ plot_species_trends <- function(out, # only observed plotted if "sim" is actuall
           # log10-index (on loge scale) -> multiplicative index
           out[s, ] <- 10^(row - row[t0])
         } else if (m_scale == "logit") {
-          # logit-occupancy -> relative occupancy p_t / p_{t0}
+          # logit-occupancy to relative occupancy p_t / p_{t0}
           p <- plogis(row)
           out[s, ] <- p / p[t0]
         } else {
@@ -1632,10 +1632,10 @@ plot_species_trends <- function(out, # only observed plotted if "sim" is actuall
     .msitheme()
 }
 
-# # 12) Example usage ####
-# sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
+# 12) Example usage ####
+# sim_args <- list(n_species = 100, n_years = 30, seed = 232680,
 #                  ## Growth rate DGP
-#                  dgp_mode = "spline", # "spline","rw","ar1","changepoint","seasonal","mixture"
+#                  dgp_mode = "mixture", # "spline","rw","ar1","changepoint","seasonal","mixture"
 #                  ## DGP options
 #                  # spline options
 #                  df_mu = 6, # default
@@ -1651,21 +1651,21 @@ plot_species_trends <- function(out, # only observed plotted if "sim" is actuall
 #                  # species/state variation
 #                  sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
 #                  innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t)
-#                  sp_trend = "none", sigma_gamma = 0.05, log_sd_se = 0.35, # "none" or "random_slope"
+#                  sp_trend = "random_slope", sigma_gamma = 0.075, log_sd_se = 0.35, # "none" or "random_slope"
 #                  use_delta = FALSE, # cross-species annual shocks?
 #                  # observation model
-#                  sigma_obs_mean = 0.02, prop_missing = 0,
+#                  sigma_obs_mean = 0.025, prop_missing = 0.7,
 #                  # Inclusion MNAR (additional to prop_missing)
-#                  inclusion_bias = list(enabled=F, # include inclusion bias?
-#                                        a0=-0.4,
-#                                        a1=3.0,
-#                                        rho1=1.2,
-#                                        rho0=0.2,
-#                                        p_init=1))
+#                  inclusion_bias = list(enabled = T, # include inclusion bias?
+#                                        a0 = -0.4,
+#                                        a1 = 3.0,
+#                                        rho1 = 1.2,
+#                                        rho0 = 0.2,
+#                                        p_init = 0.2))
 # out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
 #                          sim_args = sim_args, # as above
-#                          fit_models = c("partial","freeman", "nopool","bayes_geomean"),
-#                          #fit_models = c("partial","freeman","bayes_geomean"),
+#                          #fit_models = c("partial","freeman", "nopool","bayes_geomean"),
+#                          fit_models = c("partial","freeman","bayes_geomean"),
 #                          #fit_models = c("partial","freeman", "nopool"),
 #                          #fit_models = c("partial"),
 #                          #fit_models = c("freeman"),
@@ -1685,7 +1685,8 @@ plot_species_trends <- function(out, # only observed plotted if "sim" is actuall
 #                          # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
 #                          # but only if obs_var_model not specified
 #                          # m.scale = loge assumes data already on natural log scale
-#                          brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE, m.scale = "loge"),
+#                          brc_opts = list(num_knots = 12, seFromData = TRUE, 
+#                                          Y1perfect = FALSE, m.scale = "loge"),
 #                          ## Growth-rate presentation scale (model returns both anyway, this is for plot)
 #                          growth_scale = "log")
 # ## Convergence report
@@ -1695,12 +1696,12 @@ plot_species_trends <- function(out, # only observed plotted if "sim" is actuall
 # print(out$plots$CumLog) # M equivalents where applicable
 # print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
 # ## Inclusion diagnostics
-# evaluate_inclusion_process(out$sim, verbose = TRUE)
-# ## Spp trends (grey line = latent process; blue dot = (noisy) observations
+# evaluate_inclusion_process(out$sim)
+# ## Spp trends (grey line = latent process; blue dot = noisy obs with missingness
 # # Plot 12 randomly chosen species on log scale
 # plot_species_trends(out, n_sample = 12, scale = "log")
 # # Plot specific species (by index) as baseline-1 indices
-# plot_species_trends(out, species = c(1, 5, 9), scale = "index")
+# plot_species_trends(out, species = c(1,5,9), scale = "index")
 
 #### TO DO ####
 ## Shrinkage evaluation!

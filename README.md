@@ -254,14 +254,14 @@ evaluate_inclusion_process(out$sim, verbose = TRUE)
 ``` r
 ## Spp trends (grey lin = latent process; blue dot = (noisy) observations
 # Plot 12 randomly chosen species on log scale
-plot_species_trends(out, n_sample = 12, scale = "log")
+print(plot_species_trends(out, n_sample = 12, scale = "log"))
 ```
 
 <img src="README_files/figure-gfm/unnamed-chunk-4-4.png" style="display: block; margin: auto;" />
 
 ``` r
 # Plot specific species (by index) as baseline-1 indices
-plot_species_trends(out, species = c(1, 5, 9), scale = "index")
+print(plot_species_trends(out, species = c(1, 5, 9), scale = "index"))
 ```
 
 <img src="README_files/figure-gfm/unnamed-chunk-4-5.png" style="display: block; margin: auto;" />

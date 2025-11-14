@@ -1696,7 +1696,7 @@ plot_species_trends <- function(out, # only observed plotted if "sim" is actuall
 # print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
 # ## Inclusion diagnostics
 # evaluate_inclusion_process(out$sim, verbose = TRUE)
-# ## Spp trends (grey lin = latent process; blue dot = (noisy) observations
+# ## Spp trends (grey line = latent process; blue dot = (noisy) observations
 # # Plot 12 randomly chosen species on log scale
 # plot_species_trends(out, n_sample = 12, scale = "log")
 # # Plot specific species (by index) as baseline-1 indices

@@ -1470,7 +1470,7 @@ evaluate_inclusion_process <- function(sim) {
     freq <- table(factor(reason, levels = lvl))
     # keep nonzero only
     freq <- freq[freq > 0]
-    top <- if (length(freq)) paste(paste0(names(freq), "x", as.integer(freq)), collapse = ", ") else "no classified reason"
+    top <- if (length(freq)) paste(paste0(names(freq), " x", as.integer(freq)), collapse = ", ") else "no classified reason"
     note <- paste0(
       "All annual selection growth correlations are NA for T-1 = ", T1, ". ",
       "This is expected when inclusion or growth lacks cross-species variation (e.g., inclusion all 1s). ",
@@ -1663,7 +1663,7 @@ sim_args <- list(n_species = 100, n_years = 30, seed = 232680,
                                        a1 = 3.0,
                                        rho1 = 1.2,
                                        rho0 = 0.2,
-                                       p_init = 0.2))
+                                       p_init = 0.5))
 out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
                          sim_args = sim_args, # as above
                          #fit_models = c("partial","freeman", "nopool","bayes_geomean"),

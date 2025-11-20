@@ -135,28 +135,34 @@ sim_args <- list(n_species = 100, n_years = 30, seed = 232680,
                  K = 5, # number of groups
                  ## Simulate species options
                  # species/state variation
-                 sigma_sp = 0.05, sigma_delta = 0.05,
+                 sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
                  innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t)
-                 sp_trend = "random_slope", sigma_gamma = 0.05, # "none" or "random_slope"
+                 sp_trend = "random_slope", sigma_gamma = 0.05, log_sd_se = 0.35, # random slopes this time
                  use_delta = FALSE, # cross-species annual shocks?
                  # observation model
-                 sigma_obs_mean = 0.02, prop_missing = 0.2,
+                 sigma_obs_mean = 0.05, prop_missing = 0.2,
                  # Inclusion MNAR (additional to prop_missing)
                  inclusion_bias = list(enabled = TRUE, # include inclusion bias?
-                                       a0 = -0.4, 
+                                       a0 = -0.5, 
                                        a1 = 3.0,
-                                       rho1 = 1.2,
-                                       rho0 = 0.2,
+                                       rho1 = 1.5,
+                                       rho0 = 0.1,
                                        p_init = 1))
 out <- run_full_analysis(data_source = "simulate",
                          sim_args = sim_args,
-                         fit_models = c("partial","freeman", "nopool"), # don't run geomean here
+                         fit_models = c("partial","freeman", "nopool", "bayes_geomean"),
                          ## Model-specific settings (ovm = 2)
                          jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
                          jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
                          jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
+                         jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
+                         # smoothed version of Bayesian geomean?
+                         smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
+                         plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
+                         # impute missing spp/year combinations
+                         impute_all_geomean = T, # if false, then under MNAR this estimand differs from other models
                          ## Cross-model settings (seFromData not really needed here as ovm = 2 above)
-                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE, m.scale = "loge"),
+                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=FALSE, m.scale = "loge"),
                          ## Growth-rate presentation scale
                          growth_scale = "log", 
                          quiet = TRUE) # suppress JAGS output to console
@@ -176,3 +182,4 @@ plot_species_trends(out, n_sample = 12, scale = "log")
 plot_species_trends(out, species = c(1, 5, 9), scale = "index")
 ```
 
+## References

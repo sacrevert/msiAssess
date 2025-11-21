@@ -111,6 +111,10 @@ simulate_species_data <- function(n_species = 30, n_years = 30, seed = 232680,
                                   A = 0.15, period = 8, phi0, K_guilds = 2,
                                   # species time-series entry mode (guild_staggered for mixture DGP)
                                   entry_mode = c("none","guild_staggered","species_staggered"),
+                                  # stochastic logistic mapping for entry years when entry_mode != "none"
+                                  entry_logit_a0 = 0.0,
+                                  entry_logit_b  = -1.0,
+                                  sd_entry_year  = 1.5,
                                   # species/state variation
                                   sigma_sp = 0.15, sigma_delta = 0.05, sd_alpha0 = 0.4,
                                   innov_dist = c("normal","student_t"), df_u = 3,
@@ -148,26 +152,39 @@ simulate_species_data <- function(n_species = 30, n_years = 30, seed = 232680,
   # Species-specific additive slope (per-interval drift)
   gamma_s <- if (sp_trend == "random_slope") rnorm(n_species, 0, sigma_gamma) else rep(0, n_species)
   
-  # Guild-based staggered time-series entry
+  # Stochastic logistic entry mapping
+  entry_year <- rep(1L, n_species) # default: all enter at year 1
+  
+  # Guild-based staggered time-series entry (only meaningful for mixture DGP)
   if (entry_mode == "guild_staggered" && dgp_mode == "mixture") {
-    # Guild-level mean growth
+    # Guild-level mean structural growth (per-interval), a proxy for guild trend
     guild_mean <- vapply(mu_list, mean, numeric(1)) # length K_guilds
-    # 2. Order guilds so most negative mean enter earliest
-    ord <- order(guild_mean) # 1 = most negative trend
-    # Map ranks to discrete years, e.g. spread across [1, n_years]
-    F_g <- 1L + floor((n_years - 1) * (seq_along(ord) - 1) / (length(ord) - 1))
-    # Reorder back to original guild indexing
-    F_g[ord] <- F_g
-    # Species-specific entry years
-    entry_year <- F_g[guild]  # same F_g for all species in a guild
+    # standardise to avoid scale dependence of logit slope
+    r_g_sc <- as.numeric(scale(guild_mean))
+    
+    # expected guild entry year in [1, n_years], monotone in r_g_sc
+    E_FY_g <- 1 + (n_years - 1) * invlogit(entry_logit_a0 + entry_logit_b * r_g_sc)
+    
+    # species entry year = guild expectation + jitter
+    for (s in seq_len(n_species)) {
+      k <- guild[s]
+      entry_year[s] <- round(rnorm(1, mean = E_FY_g[k], sd = sd_entry_year))
+    }
+    entry_year <- pmin(n_years, pmax(1L, entry_year))
   }
   
-  # species-based staggered time-series entry
+  # Species-based staggered entry
   if (entry_mode == "species_staggered") {
-    # early entry for more negative gamma_s
-    rnk <- rank(gamma_s, ties.method = "average")
-    entry_year <- 1L + floor((n_years - 1) * (rnk - 1) / (n_species - 1))
-    # Now smallest gamma_s (decliners) get smallest entry_year
+    # species-level mean structural growth proxy (includes gamma_s drift)
+    mu_bar_s <- vapply(seq_len(n_species), function(s) mean(mu_for_species(s)), numeric(1)) + gamma_s
+    r_s_sc   <- as.numeric(scale(mu_bar_s))
+    
+    # expected species entry year in [1, n_years]
+    E_FY_s <- 1 + (n_years - 1) * invlogit(entry_logit_a0 + entry_logit_b * r_s_sc)
+    
+    # jitter + clamp
+    entry_year <- round(rnorm(n_species, mean = E_FY_s, sd = sd_entry_year))
+    entry_year <- pmin(n_years, pmax(1L, entry_year))
   }
   
   # Latent log-indices l_{s,t}
@@ -223,7 +240,7 @@ simulate_species_data <- function(n_species = 30, n_years = 30, seed = 232680,
     I[miss] <- 0L # I now reflects both MCAR (if > 0) + MNAR (if TRUE)
   }
   
-  # if there is structured entry (species_staggered or guild_staggered) then:
+  # Apply structured entry after MNAR/MCAR so I reflects total availability
   if (entry_mode != "none") {
     for (s in seq_len(n_species)) {
       ey <- entry_year[s]
@@ -279,11 +296,13 @@ simulate_species_data <- function(n_species = 30, n_years = 30, seed = 232680,
     meta = list(dgp_mode = dgp_mode,
                 K_guilds = K_guilds,
                 entry_mode = entry_mode,
+                entry_logit_a0 = entry_logit_a0,
+                entry_logit_b  = entry_logit_b,
+                sd_entry_year  = sd_entry_year,
                 empirical = FALSE,
                 m_scale = "loge") # reminder that sim implicitly on natural log scale
   )
 }
-
 
 # 2b) Approximate calibration of a0 for a target long-run inclusion pi_star ####
 # This could be used to set a0 in the MNAR sim setting, given a proportion of species
@@ -1203,6 +1222,9 @@ as_sim_from_empirical <- function(index_mat, se_mat = NULL, years = NULL,
   # ensure SEs are NA wherever the index is missing (all scales)
   se_loge[!is.finite(idx_loge)] <- NA_real_
   
+  # when are species observed?
+  obs_mask <- 1L * is.finite(index_mat)
+  
   list(
     years = years %||% seq_len(ny),
     y     = idx_loge,
@@ -1212,7 +1234,8 @@ as_sim_from_empirical <- function(index_mat, se_mat = NULL, years = NULL,
     gamma_s = rep(0, nsp),
     innov_dist = NA, df_u = NA,
     inclusion_bias = list(enabled = FALSE),
-    I = matrix(1L, nsp, ny),
+    #I = matrix(1L, nsp, ny),
+    I = obs_mask,
     use_delta = FALSE,
     meta = list(empirical = TRUE,
                 m_scale = m.scale) # original scale flag
@@ -1460,26 +1483,54 @@ burstiness_index <- function(x) {
 ## Note that this function evaluates combined missingness (MNAR + MCAR)
 ## We would need a pre-MCAR copy of I if we wanted to
 ## seperate them (see simulate data function)
-evaluate_inclusion_process <- function(sim) {
+## trend_proxy requires per-species trend proxy (e.g. linear slope of log-index on year)
+evaluate_inclusion_process <- function(sim, trend_proxy = NULL, verbose = TRUE) {
   stopifnot(!is.null(sim$I))
   I <- sim$I
+  nY <- ncol(I)
+  
+  ## Basic transition and burstiness
   trans <- transition_probs(I)
   rl1 <- run_lengths(I, 1L)
   rl0 <- run_lengths(I, 0L)
   B1 <- burstiness_index(rl1)
   B0 <- burstiness_index(rl0)
-  nY <- length(sim$years)
+  
+  ## Entry / exit / duration summaries
+  FY <- apply(I, 1, function(z) {
+    ii <- which(z == 1L)
+    if (length(ii) == 0L) NA_integer_ else min(ii)
+  })
+  LY <- apply(I, 1, function(z) {
+    ii <- which(z == 1L)
+    if (length(ii) == 0L) NA_integer_ else max(ii)
+  })
+  D  <- LY - FY + 1L
+  
+  entry_stats <- list(
+    FY = FY,
+    LY = LY,
+    duration = D,
+    prop_never_observed = mean(is.na(FY)),
+    prop_enter_after_1 = mean(FY > 1L, na.rm = TRUE),
+    mean_FY = mean(FY, na.rm = TRUE),
+    median_FY = stats::median(FY, na.rm = TRUE),
+    mean_duration = mean(D, na.rm = TRUE),
+    median_duration = stats::median(D, na.rm = TRUE)
+  )
   
   # r_{s,t-1} used in selection
   if (!is.null(sim$mu_true)) {
-    r_mat <- outer(rep(1, nrow(I)), sim$mu_true + sim$delta_true) + outer(sim$gamma_s, rep(1, nY-1))
+    r_mat <- outer(rep(1, nrow(I)), sim$mu_true + sim$delta_true) +
+      outer(sim$gamma_s, rep(1, nY - 1))
     r_src <- "mu_true + delta_true (+ gamma_s)"
   } else if (!is.null(sim$mu_list)) {
+    T1 <- nY - 1
     mu_vec_t <- function(t) sapply(seq_len(nrow(I)), function(s) sim$mu_list[[ sim$guild[s] ]][t])
-    r_mat <- t(sapply(1:(nY-1), function(t) mu_vec_t(t) + sim$delta_true[t] + sim$gamma_s))
+    r_mat <- t(sapply(1:T1, function(t) mu_vec_t(t) + sim$delta_true[t] + sim$gamma_s))
     r_src <- "mu_list (+ delta_true, gamma_s)"
   } else {
-    r_mat <- matrix(NA_real_, nrow = nY-1, ncol = nrow(I))
+    r_mat <- matrix(NA_real_, nrow = nY - 1, ncol = nrow(I))
     r_src <- "unavailable (no mu_true/mu_list)"
   }
   
@@ -1499,9 +1550,7 @@ evaluate_inclusion_process <- function(sim) {
     } else if (ncol(r_mat) == T1 && nrow(r_mat) == nrow(I)) {
       as.numeric(r_mat[, tt])
     } else {
-      stop("r_mat must be (T-1) x S or S x (T-1); got ",
-           paste(dim(r_mat), collapse = "x"), " vs I dims ",
-           paste(dim(I), collapse = "x"))
+      as.numeric(rep(NA_real_, nrow(I)))
     }
     I_t <- as.numeric(I[, t])
     ok <- is.finite(I_t) & is.finite(r_t)
@@ -1522,8 +1571,21 @@ evaluate_inclusion_process <- function(sim) {
     reason[tt] <- "ok"
   }
   
-  if (all(!is.finite(r_mat))) {
-    reason[] <- "no_generator_growth"
+  note <- NULL
+  if (all(is.na(cor_t))) {
+    lvl <- c("too_few_pairs","no_variation_I","no_variation_r",
+             "no_variation_both","no_generator_growth","ok")
+    freq <- table(factor(reason, levels = lvl))
+    freq <- freq[freq > 0]
+    top <- if (length(freq)) paste(paste0(names(freq), "x", as.integer(freq)), collapse = ", ")
+    else "no classified reason"
+    note <- paste0(
+      "All annual selection–growth correlations are NA for T-1 = ", T1, ". ",
+      "This is expected when inclusion or growth lacks cross-species variation ",
+      "(e.g., cohort entry with all zeros early on). ",
+      "Reason summary: [", top, "]. Source of r: ", r_src, "."
+    )
+    if (isTRUE(verbose)) message(note)
   }
   
   diag_df <- data.frame(
@@ -1535,20 +1597,21 @@ evaluate_inclusion_process <- function(sim) {
     stringsAsFactors = FALSE
   )
   
-  note <- NULL
-  if (all(is.na(cor_t))) {
-    # summarise reasons (including counts for clarity)
-    lvl <- c("too_few_pairs","no_variation_I","no_variation_r","no_variation_both","no_generator_growth","ok")
-    freq <- table(factor(reason, levels = lvl))
-    # keep nonzero only
-    freq <- freq[freq > 0]
-    top <- if (length(freq)) paste(paste0(names(freq), " x", as.integer(freq)), collapse = ", ") else "no classified reason"
-    note <- paste0(
-      "All annual selection growth correlations are NA for T-1 = ", T1, ". ",
-      "This is expected when inclusion or growth lacks cross-species variation (e.g., inclusion all 1s). ",
-      "Reason summary: [", top, "]. Source of r: ", r_src, "."
-    )
-    #if (isTRUE(verbose)) message(note)
+  ## Optional trend–entry association (empirical or simulated)
+  trend_entry <- NULL
+  if (!is.null(trend_proxy)) {
+    if (length(trend_proxy) != nrow(I)) {
+      warning("trend_proxy length does not match number of species; trend–entry stats omitted.")
+    } else {
+      ok <- is.finite(FY) & is.finite(trend_proxy)
+      if (sum(ok) >= 3L) {
+        trend_entry <- list(
+          trend_proxy = trend_proxy,
+          cor_FY_trend = stats::cor(FY[ok], trend_proxy[ok]),
+          lm_FY_on_trend = stats::coef(stats::lm(FY[ok] ~ trend_proxy[ok]))
+        )
+      }
+    }
   }
   
   list(
@@ -1557,6 +1620,8 @@ evaluate_inclusion_process <- function(sim) {
     run_lengths_out = rl0,
     burstiness_in = round(B1, 3),
     burstiness_out = round(B0, 3),
+    entry_stats = entry_stats,
+    trend_entry = trend_entry,
     cor_I_r_by_year = cor_t,
     diagnostics = diag_df,
     note = note
@@ -1766,11 +1831,11 @@ sim_args <- list(n_species = 100, n_years = 30, seed = 232680,
                  use_delta = FALSE, # Use cross-species annual shocks?
                  # observation model
                  sigma_obs_mean = 0.2,
-                 prop_missing = 0.2,
+                 prop_missing = 0.2, # set to 0 if using approx_a0_for_target_pi() for MNAR
                  ## Inclusion MNAR (additional to prop_missing)
                  # setting use_delta = T means cross-spp shocks enter inclusion selection predictor too
-                 inclusion_bias = list(enabled = F, # include inclusion bias?
-                                       a0 = -1, # lower = P(inc) down at avg growth
+                 inclusion_bias = list(enabled = T, # include inclusion bias?
+                                       a0 = -0.4, # lower = P(inc) down at avg growth
                                        a1 = 5.0, # higher = P(inc) sensitive to recent growth
                                        # rho1 - rho0 up = increase stickiness
                                        rho1 = 1.2,
@@ -1830,13 +1895,17 @@ p1
 p2 <- filter_indicator_plot(p0, keep_models = c("Partial", "Freeman"))
 p2
 
+## Tuning function to paramterise logistic intercept a0 for target pi_star
+# requires prop_missing = 0
+approx_a0_for_target_pi(out$sim, pi_star = 0.5, method = "markov")
+
 #### TO DO ####
+# MAJOR:
 # Shrinkage evaluation!
-# Extend MNAR options? See "A small taxonomy of MNAR selection rules"
-# Inspect impact of p_init on bias (low p_init reduces MNAR bias?)
+# Inspect impact of p_init on bias (low p_init reduces MNAR bias? interaction with entry_mode?)
+#
+# MINOR:
 # Fix graph colour levels when different numbers of models (i.e. M_prime v others when geomean included)
 # Warning when seFromData setting contradicts specified ovm option
 
 # End of file #
-
-approx_a0_for_target_pi(out$sim, pi_star = 0.2, method = "markov")

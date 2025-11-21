@@ -152,10 +152,10 @@ out <- run_full_analysis(data_source = "simulate",
                          sim_args = sim_args,
                          fit_models = c("partial","freeman", "nopool", "bayes_geomean"),
                          ## Model-specific settings (ovm = 2)
-                         jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-                         jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-                         jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
-                         jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
+                         jags_partial = list(df_mu=6, obs_var_model=4, n_iter=500, n_burn=100),
+                         jags_nopool = list(df_mu=6, obs_var_model=4, n_iter=500, n_burn=100),
+                         jags_freeman = list(obs_var_model=4, n_iter=500, n_burnin=100),
+                         jags_bayes_geomean = list(obs_var_model=4, n_iter=500, n_burnin=100),
                          # smoothed version of Bayesian geomean?
                          smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
                          plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
@@ -164,7 +164,7 @@ out <- run_full_analysis(data_source = "simulate",
                          ## Cross-model settings (seFromData not really needed here as ovm = 2 above)
                          brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=FALSE, m.scale = "loge"),
                          ## Growth-rate presentation scale
-                         growth_scale = "log", 
+                         growth_scale = "log",
                          quiet = TRUE) # suppress JAGS output to console
 
 # Indicator plots

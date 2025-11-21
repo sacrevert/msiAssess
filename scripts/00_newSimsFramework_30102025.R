@@ -1,7 +1,7 @@
 # MSI + shrinkage + Freeman (R + JAGS)
 # Sticky MNAR, multiple DGPs, empirical input (with/without SEs),
 # convergence checks, and plotting.
-#rm(list=ls())
+rm(list=ls())
 
 suppressPackageStartupMessages({
   library(R2jags)
@@ -193,8 +193,9 @@ simulate_species_data <- function(n_species = 30, n_years = 30, seed = 232680,
   
   if (prop_missing > 0) {
     miss <- matrix(runif(n_species * n_years) < prop_missing, n_species, n_years)
-    y[miss]  <- NA_real_;  se[miss] <- NA_real_
-    if (isTRUE(inclusion_bias$enabled)) I[miss] <- 0L
+    y[miss]  <- NA_real_
+    se[miss] <- NA_real_
+    I[miss] <- 0L
   }
   
   ## Truth constructs ####
@@ -298,7 +299,7 @@ approx_a0_for_target_pi <- function(sim, # e.g. out$sim object from run_full_ana
     pi - pi_star
   }
   
-  # Robust bracket: for reasonable a1, rho0, rho1, π(a0) moves from ~0 to ~1 over this range
+  # Robust bracket: for reasonable a1, rho0, rho1, pi(a0) moves from ~0 to ~1 over this range
   root <- uniroot(f, interval = c(-20, 20))
   root$root
 }
@@ -1396,9 +1397,9 @@ transition_probs <- function(I) {
   p11 <- ifelse((N11 + N10) > 0, N11 / (N11 + N10), NA_real_)
   p00 <- ifelse((N01 + N00) > 0, N00 / (N01 + N00), NA_real_)
   pi  <- mean(Icur)
-  list(p11 = p11, p00 = p00, pi = pi,
-       Ein = ifelse(!is.na(p11), 1/(1 - p11), NA_real_),
-       Eout= ifelse(!is.na(p00), 1/(1 - p00), NA_real_))
+  list(p11 = round(p11, 3), p00 = round(p00, 3), pi = round(pi, 3),
+       Ein = ifelse(!is.na(p11), signif(1/(1 - p11), 3), NA_real_),
+       Eout= ifelse(!is.na(p00), signif(1/(1 - p00), 3), NA_real_))
 }
 
 run_lengths <- function(I, v = 1L) {
@@ -1418,6 +1419,9 @@ burstiness_index <- function(x) {
   (s - m) / (s + m)
 }
 
+## Note that this function evaluates combined missingness (MNAR + MCAR)
+## We would need a pre-MCAR copy of I if we wanted to
+## seperate them (see simulate data function)
 evaluate_inclusion_process <- function(sim) {
   stopifnot(!is.null(sim$I))
   I <- sim$I

@@ -51,6 +51,8 @@ sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
                  A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
                  # mixture of random walks
                  K_guilds = 5, # number of groups
+                 # time-series entry mode
+                 entry_mode = c("none"),
                  ## Simulate species/observation options (cross-DGP)
                  # species/state variation
                  sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
@@ -239,6 +241,8 @@ sim_args <- list(n_species = 100, n_years = 30, seed = 232680,
                  sigma_eta = 0.05, phi = 0.7,
                  # mixture of random walks
                  K = 5, # number of groups
+                 # time-series entry mode
+                 entry_mode = c("none"),
                  ## Simulate species options
                  # species/state variation
                  sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,

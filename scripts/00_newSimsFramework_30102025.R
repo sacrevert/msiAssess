@@ -1,7 +1,7 @@
 # MSI + shrinkage + Freeman (R + JAGS)
 # Sticky MNAR, multiple DGPs, empirical input (with/without SEs),
 # convergence checks, and plotting.
-rm(list=ls())
+#rm(list=ls())
 
 suppressPackageStartupMessages({
   library(R2jags)
@@ -109,6 +109,8 @@ simulate_species_data <- function(n_species = 30, n_years = 30, seed = 232680,
                                   df_mu = 6, sigma_eta = 0.05, phi = 0.7,
                                   n_cp = 2, jump_sd = 0.15, piecewise_linear = FALSE,
                                   A = 0.15, period = 8, phi0, K_guilds = 2,
+                                  # species time-series entry mode (guild_staggered for mixture DGP)
+                                  entry_mode = c("none","guild_staggered","species_staggered"),
                                   # species/state variation
                                   sigma_sp = 0.15, sigma_delta = 0.05, sd_alpha0 = 0.4,
                                   innov_dist = c("normal","student_t"), df_u = 3,
@@ -120,7 +122,8 @@ simulate_species_data <- function(n_species = 30, n_years = 30, seed = 232680,
                                   inclusion_bias = list(enabled=FALSE, a0=-0.5, a1=3.0, rho1=1.0, rho0=0.0, p_init=1)) {
   set.seed(seed)
   dgp_mode <- match.arg(dgp_mode)
-  innov_dist<- match.arg(innov_dist)
+  entry_mode <- match.arg(entry_mode)
+  innov_dist <- match.arg(innov_dist)
   sp_trend <- match.arg(sp_trend)
   years <- 1:n_years
   
@@ -144,6 +147,28 @@ simulate_species_data <- function(n_species = 30, n_years = 30, seed = 232680,
   
   # Species-specific additive slope (per-interval drift)
   gamma_s <- if (sp_trend == "random_slope") rnorm(n_species, 0, sigma_gamma) else rep(0, n_species)
+  
+  # Guild-based staggered time-series entry
+  if (entry_mode == "guild_staggered" && dgp_mode == "mixture") {
+    # Guild-level mean growth
+    guild_mean <- vapply(mu_list, mean, numeric(1)) # length K_guilds
+    # 2. Order guilds so most negative mean enter earliest
+    ord <- order(guild_mean) # 1 = most negative trend
+    # Map ranks to discrete years, e.g. spread across [1, n_years]
+    F_g <- 1L + floor((n_years - 1) * (seq_along(ord) - 1) / (length(ord) - 1))
+    # Reorder back to original guild indexing
+    F_g[ord] <- F_g
+    # Species-specific entry years
+    entry_year <- F_g[guild]  # same F_g for all species in a guild
+  }
+  
+  # species-based staggered time-series entry
+  if (entry_mode == "species_staggered") {
+    # early entry for more negative gamma_s
+    rnk <- rank(gamma_s, ties.method = "average")
+    entry_year <- 1L + floor((n_years - 1) * (rnk - 1) / (n_species - 1))
+    # Now smallest gamma_s (decliners) get smallest entry_year
+  }
   
   # Latent log-indices l_{s,t}
   l_true <- matrix(NA_real_, n_species, n_years)
@@ -195,7 +220,19 @@ simulate_species_data <- function(n_species = 30, n_years = 30, seed = 232680,
     miss <- matrix(runif(n_species * n_years) < prop_missing, n_species, n_years)
     y[miss]  <- NA_real_
     se[miss] <- NA_real_
-    I[miss] <- 0L
+    I[miss] <- 0L # I now reflects both MCAR (if > 0) + MNAR (if TRUE)
+  }
+  
+  # if there is structured entry (species_staggered or guild_staggered) then:
+  if (entry_mode != "none") {
+    for (s in seq_len(n_species)) {
+      ey <- entry_year[s]
+      if (ey > 1L) {
+        I[s, 1:(ey-1)]  <- 0L
+        y[s, 1:(ey-1)]  <- NA_real_
+        se[s, 1:(ey-1)] <- NA_real_
+      }
+    }
   }
   
   ## Truth constructs ####
@@ -241,6 +278,7 @@ simulate_species_data <- function(n_species = 30, n_years = 30, seed = 232680,
     use_delta = use_delta,
     meta = list(dgp_mode = dgp_mode,
                 K_guilds = K_guilds,
+                entry_mode = entry_mode,
                 empirical = FALSE,
                 m_scale = "loge") # reminder that sim implicitly on natural log scale
   )
@@ -1704,96 +1742,101 @@ filter_indicator_plot <- function(p,
 }
 
 # 13) Example usage ####
-# sim_args <- list(n_species = 100, n_years = 30, seed = 232680,
-#                  ## Growth rate DGP
-#                  dgp_mode = "mixture", # "spline","rw","ar1","changepoint","seasonal","mixture"
-#                  ## DGP options
-#                  # spline options
-#                  df_mu = 6, # default
-#                  # RW / AR1
-#                  sigma_eta = 0.05, phi = 0.7,
-#                  # changepoint
-#                  n_cp = 2, jump_sd = 0.15, piecewise_linear = FALSE,
-#                  # seasonal
-#                  A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
-#                  # mixture of random walks
-#                  K_guilds = 5, # number of groups
-#                  ## Simulate species options
-#                  # species/state variation
-#                  sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
-#                  innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t)
-#                  sp_trend = "random_slope", sigma_gamma = 0.02, log_sd_se = 0.35, # "none" or "random_slope"
-#                  use_delta = FALSE, # Use cross-species annual shocks?
-#                  # observation model
-#                  sigma_obs_mean = 0.2,
-#                  prop_missing = 0.1,
-#                  ## Inclusion MNAR (additional to prop_missing)
-#                  # setting use_delta = T means cross-spp shocks enter inclusion selection predictor too
-#                  inclusion_bias = list(enabled = T, # include inclusion bias?
-#                                        a0 = -1, # lower = P(inc) down at avg growth
-#                                        a1 = 5.0, # higher = P(inc) sensitive to recent growth
-#                                        # rho1 - rho0 up = increase stickiness
-#                                        rho1 = 2,
-#                                        rho0 = 0.1,
-#                                        p_init = 0.2)) # initial inc prob
-# out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
-#                          sim_args = sim_args, # as above
-#                          fit_models = NULL, # sim/empirical outs only
-#                          #fit_models = c("partial","freeman", "nopool","bayes_geomean"),
-#                          #fit_models = c("partial","freeman","bayes_geomean"),
-#                          #fit_models = c("partial","freeman", "nopool"),
-#                          #fit_models = c("partial"),
-#                          #fit_models = c("freeman"),
-#                          #fit_models = c("freeman","bayes_geomean"),
-#                          #fit_models = c("bayes_geomean"),
-#                          ## Model-specific settings
-#                          jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-#                          jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-#                          jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
-#                          jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
-#                          smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
-#                          plot_geomean = FALSE, # plot unsmoothed Bayes geomean MSI
-#                          # impute missing spp/year combinations
-#                          impute_all_geomean = T, # if false, then under MNAR the estimand differs from other models
-#                          plot_MNAR = TRUE, # plot sampled species "truth" alongside actual truth
-#                          ## Cross-model settings
-#                          # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
-#                          # but only if obs_var_model not specified
-#                          # m.scale = loge assumes data already on natural log scale
-#                          brc_opts = list(num_knots = 12, seFromData = TRUE,
-#                                          Y1perfect = FALSE, m.scale = "loge"),
-#                          ## Growth-rate presentation scale (model returns both anyway, this is for plot)
-#                          growth_scale = "log",
-#                          quiet = FALSE) # suppress JAGS output or not
-# ## Convergence report
-# out$checks
-# ## Plots
-# print(out$plots$MSI) # M_prime equivalents
-# print(out$plots$CumLog) # M equivalents where applicable
-# print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
-# ## Inclusion diagnostics
-# evaluate_inclusion_process(out$sim)
-# ## Spp trends (grey line = latent process; blue dot = noisy obs with missingness
-# # Plot 12 randomly chosen species on log scale
-# plot_species_trends(out, n_sample = 12, scale = "log")
-# # Plot specific species (by index) as baseline-1 indices
-# plot_species_trends(out, species = c(1,5,9), scale = "index")
-# 
-# ## Filtering plots for display
-# # Original plot
-# p0 <- out$plots$CumLog
-# p0
-# # Drop the "Nopool" model
-# p1 <- filter_indicator_plot(p0, drop_models = "Nopool")
-# p1
-# # Keep only Partial and Freeman curves
-# p2 <- filter_indicator_plot(p0, keep_models = c("Partial", "Freeman"))
-# p2
-# 
-# #### TO DO ####
-# # Shrinkage evaluation!
-# # Extend MNAR options? See "A small taxonomy of MNAR selection rules"
-# 
-# # End of file #
-# 
-# approx_a0_for_target_pi(out$sim, pi_star = 0.2, method = "markov")
+sim_args <- list(n_species = 100, n_years = 30, seed = 232680,
+                 ## Growth rate DGP
+                 dgp_mode = "mixture", # "spline","rw","ar1","changepoint","seasonal","mixture"
+                 ## DGP options
+                 # spline options
+                 df_mu = 6, # default
+                 # RW / AR1
+                 sigma_eta = 0.05, phi = 0.7,
+                 # changepoint
+                 n_cp = 2, jump_sd = 0.15, piecewise_linear = FALSE,
+                 # seasonal
+                 A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
+                 # mixture of random walks
+                 K_guilds = 5, # number of groups
+                 # species time-series entry mode (guild_staggered for mixture DGP)
+                 entry_mode = c("guild_staggered"),
+                 ## Simulate species options
+                 # species/state variation
+                 sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
+                 innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t)
+                 sp_trend = "random_slope", sigma_gamma = 0.02, log_sd_se = 0.35, # "none" or "random_slope"
+                 use_delta = FALSE, # Use cross-species annual shocks?
+                 # observation model
+                 sigma_obs_mean = 0.2,
+                 prop_missing = 0.2,
+                 ## Inclusion MNAR (additional to prop_missing)
+                 # setting use_delta = T means cross-spp shocks enter inclusion selection predictor too
+                 inclusion_bias = list(enabled = F, # include inclusion bias?
+                                       a0 = -1, # lower = P(inc) down at avg growth
+                                       a1 = 5.0, # higher = P(inc) sensitive to recent growth
+                                       # rho1 - rho0 up = increase stickiness
+                                       rho1 = 1.2,
+                                       rho0 = 0.1,
+                                       p_init = 0.2)) # initial inc prob
+out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
+                         sim_args = sim_args, # as above
+                         fit_models = NULL, # sim/empirical outs only
+                         #fit_models = c("partial","freeman", "nopool","bayes_geomean"),
+                         #fit_models = c("partial","freeman","bayes_geomean"),
+                         #fit_models = c("partial","freeman", "nopool"),
+                         #fit_models = c("partial"),
+                         #fit_models = c("freeman"),
+                         #fit_models = c("freeman","bayes_geomean"),
+                         #fit_models = c("bayes_geomean"),
+                         ## Model-specific settings
+                         jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+                         jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+                         jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
+                         jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
+                         smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
+                         plot_geomean = FALSE, # plot unsmoothed Bayes geomean MSI
+                         # impute missing spp/year combinations
+                         impute_all_geomean = T, # if false, then under MNAR the estimand differs from other models
+                         plot_MNAR = TRUE, # plot sampled species "truth" alongside actual truth
+                         ## Cross-model settings
+                         # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
+                         # but only if obs_var_model not specified
+                         # m.scale = loge assumes data already on natural log scale
+                         brc_opts = list(num_knots = 12, seFromData = TRUE,
+                                         Y1perfect = FALSE, m.scale = "loge"),
+                         ## Growth-rate presentation scale (model returns both anyway, this is for plot)
+                         growth_scale = "log",
+                         quiet = FALSE) # suppress JAGS output or not
+## Convergence report
+out$checks
+## Plots
+print(out$plots$MSI) # M_prime equivalents
+print(out$plots$CumLog) # M equivalents where applicable
+print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
+## Inclusion diagnostics
+evaluate_inclusion_process(out$sim)
+## Spp trends (grey line = latent process; blue dot = noisy obs with missingness
+# Plot 12 randomly chosen species on log scale
+plot_species_trends(out, n_sample = 12, scale = "log")
+# Plot specific species (by index) as baseline-1 indices
+plot_species_trends(out, species = c(1,5,9), scale = "index")
+
+## Filtering plots for display
+# Original plot
+p0 <- out$plots$CumLog
+p0
+# Drop the "Nopool" model
+p1 <- filter_indicator_plot(p0, drop_models = "Nopool")
+p1
+# Keep only Partial and Freeman curves
+p2 <- filter_indicator_plot(p0, keep_models = c("Partial", "Freeman"))
+p2
+
+#### TO DO ####
+# Shrinkage evaluation!
+# Extend MNAR options? See "A small taxonomy of MNAR selection rules"
+# Inspect impact of p_init on bias (low p_init reduces MNAR bias?)
+# Fix graph colour levels when different numbers of models (i.e. M_prime v others when geomean included)
+# Warning when seFromData setting contradicts specified ovm option
+
+# End of file #
+
+approx_a0_for_target_pi(out$sim, pi_star = 0.2, method = "markov")

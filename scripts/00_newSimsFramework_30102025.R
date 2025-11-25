@@ -1480,6 +1480,33 @@ burstiness_index <- function(x) {
   (s - m) / (s + m)
 }
 
+estimate_trend_proxy <- function(sim, mat = c("y","l_true"), min_n = 2) {
+  mat <- match.arg(mat)
+  Y <- sim[[mat]] # S x T matrix on loge (or logit) scale
+  t <- sim$years # length T
+  
+  stopifnot(is.matrix(Y), length(t) == ncol(Y))
+  
+  slope1 <- function(y, x) {
+    ok <- is.finite(y) & is.finite(x)
+    if (sum(ok) < min_n) return(NA_real_)
+    xok <- x[ok]; yok <- y[ok]
+    cov(xok, yok) / var(xok)
+  }
+  
+  apply(Y, 1, slope1, x = t)
+}
+# example for empirical or simulated observed indices:
+#trend_proxy <- estimate_trend_proxy(out$sim, mat = "y")
+# if you want true latent slopes in a simulation:
+#trend_proxy_true <- estimate_trend_proxy(out$sim, mat = "l_true")
+# if you want slopes from fitted JAGS model, take point estimate of `l` first
+# e.g. posterior median latent log-index (S x T)
+#l_med <- apply(out$fits$partial$BUGSoutput$sims.list$l, c(2,3), median)
+#sim_tmp <- out$sim
+#sim_tmp$l_med <- l_med
+#trend_proxy_post <- estimate_trend_proxy(sim_tmp, mat = "l_med")
+
 ## Note that this function evaluates combined missingness (MNAR + MCAR)
 ## We would need a pre-MCAR copy of I if we wanted to
 ## seperate them (see simulate data function)
@@ -1513,9 +1540,9 @@ evaluate_inclusion_process <- function(sim, trend_proxy = NULL, verbose = TRUE) 
     duration = D,
     prop_never_observed = mean(is.na(FY)),
     prop_enter_after_1 = mean(FY > 1L, na.rm = TRUE),
-    mean_FY = mean(FY, na.rm = TRUE),
+    mean_FY = round(mean(FY, na.rm = TRUE), 2),
     median_FY = stats::median(FY, na.rm = TRUE),
-    mean_duration = mean(D, na.rm = TRUE),
+    mean_duration = round(mean(D, na.rm = TRUE), 2),
     median_duration = stats::median(D, na.rm = TRUE)
   )
   
@@ -1606,9 +1633,9 @@ evaluate_inclusion_process <- function(sim, trend_proxy = NULL, verbose = TRUE) 
       ok <- is.finite(FY) & is.finite(trend_proxy)
       if (sum(ok) >= 3L) {
         trend_entry <- list(
-          trend_proxy = trend_proxy,
-          cor_FY_trend = stats::cor(FY[ok], trend_proxy[ok]),
-          lm_FY_on_trend = stats::coef(stats::lm(FY[ok] ~ trend_proxy[ok]))
+          trend_proxy = round(trend_proxy, 3),
+          cor_FY_trend = round(stats::cor(FY[ok], trend_proxy[ok]), 3),
+          lm_FY_on_trend = round(stats::coef(stats::lm(FY[ok] ~ trend_proxy[ok])), 3)
         )
       }
     }

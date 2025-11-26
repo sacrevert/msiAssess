@@ -126,6 +126,8 @@ plot_species_trends(out, species = c(1, 5, 9), scale = "index")
 ```
 
 ## "Imperfect" data scenario (MNAR missingness)
+Note that here missing species/year index combinations are being imputed for the Bayesian geomean (`impute_all_geomean = T`). If we switched this to `FALSE`, then the estimand is no longer comparable to the other methods.
+
 ```{r}
 sim_args <- list(n_species = 100, n_years = 30, seed = 232680,
                  ## Growth rate DGP
@@ -184,6 +186,34 @@ evaluate_inclusion_process(out$sim)
 plot_species_trends(out, n_sample = 12, scale = "log")
 # Plot specific species (by index) as baseline-1 indices
 plot_species_trends(out, species = c(1, 5, 9), scale = "index")
+```
+
+And the same model run without the imputation for the Bayesian geomean:
+
+```{r}
+out2 <- run_full_analysis(data_source = "simulate",
+                         sim_args = sim_args,
+                         fit_models = c("partial","freeman", "nopool", "bayes_geomean"),
+                         ## Model-specific settings (ovm = 2)
+                         jags_partial = list(df_mu=6, obs_var_model=4, n_iter=500, n_burn=100),
+                         jags_nopool = list(df_mu=6, obs_var_model=4, n_iter=500, n_burn=100),
+                         jags_freeman = list(obs_var_model=4, n_iter=500, n_burnin=100),
+                         jags_bayes_geomean = list(obs_var_model=4, n_iter=500, n_burnin=100),
+                         # smoothed version of Bayesian geomean?
+                         smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
+                         plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
+                         # impute missing spp/year combinations
+                         impute_all_geomean = FALSE, # if false, then under MNAR this estimand differs from other models
+                         ## Cross-model settings (seFromData not really needed here as ovm = 2 above)
+                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=FALSE, m.scale = "loge"),
+                         ## Growth-rate presentation scale
+                         growth_scale = "log",
+                         quiet = TRUE) # suppress JAGS output to console
+
+# Indicator plots
+print(out2$plots$MSI) # M_prime equivalents
+print(out2$plots$CumLog) # M equivalents where applicable
+print(out2$plots$Growth) # annual growth on scale specified in run_full_analysis()
 ```
 
 ## References

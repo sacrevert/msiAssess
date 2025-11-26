@@ -176,6 +176,41 @@ evaluate_inclusion_process(out$sim) # Not informative for perfect sample with no
     $burstiness_out
     [1] NA
 
+    $entry_stats
+    $entry_stats$FY
+     [1] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+    [39] 1 1
+
+    $entry_stats$LY
+     [1] 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30
+    [26] 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30
+
+    $entry_stats$duration
+     [1] 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30
+    [26] 30 30 30 30 30 30 30 30 30 30 30 30 30 30 30
+
+    $entry_stats$prop_never_observed
+    [1] 0
+
+    $entry_stats$prop_enter_after_1
+    [1] 0
+
+    $entry_stats$mean_FY
+    [1] 1
+
+    $entry_stats$median_FY
+    [1] 1
+
+    $entry_stats$mean_duration
+    [1] 30
+
+    $entry_stats$median_duration
+    [1] 30
+
+
+    $trend_entry
+    NULL
+
     $cor_I_r_by_year
      [1] NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA NA
     [26] NA NA NA NA
@@ -213,7 +248,7 @@ evaluate_inclusion_process(out$sim) # Not informative for perfect sample with no
     29   30      40    0    0 no_variation_both
 
     $note
-    [1] "All annual selection growth correlations are NA for T-1 = 29. This is expected when inclusion or growth lacks cross-species variation (e.g., inclusion all 1s). Reason summary: [no_variation_both x29]. Source of r: mu_true + delta_true (+ gamma_s)."
+    [1] "All annual selection–growth correlations are NA for T-1 = 29. This is expected when inclusion or growth lacks cross-species variation (e.g., cohort entry with all zeros early on). Reason summary: [no_variation_bothx29]. Source of r: mu_true + delta_true (+ gamma_s)."
 
 ``` r
 ## Spp trends (grey line = latent process; blue dot = noisy obs with missingness
@@ -231,6 +266,11 @@ plot_species_trends(out, species = c(1, 5, 9), scale = "index")
 <img src="README_files/figure-gfm/unnamed-chunk-4-5.png" style="display: block; margin: auto;" />
 
 ## “Imperfect” data scenario (MNAR missingness)
+
+Note that here missing species/year index combinations are being imputed
+for the Bayesian geomean (`impute_all_geomean = T`). If we switched this
+to `FALSE`, then the estimand is no longer comparable to the other
+methods.
 
 ``` r
 sim_args <- list(n_species = 100, n_years = 30, seed = 232680,
@@ -376,6 +416,46 @@ evaluate_inclusion_process(out$sim)
     $burstiness_out
     [1] -0.045
 
+    $entry_stats
+    $entry_stats$FY
+      [1] 1 2 1 1 1 3 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2
+     [38] 1 2 2 1 1 1 1 1 3 1 1 1 1 1 1 1 1 5 1 1 2 1 1 2 1 3 1 1 1 1 1 2 7 4 1 5 1
+     [75] 1 1 1 1 2 1 1 1 1 9 1 1 1 1 1 1 2 1 1 1 1 2 2 1 1 2
+
+    $entry_stats$LY
+      [1] 30 17 28 28 30 30 27 25 28 30 30 29 10 30 25 29 30 24 30 30 28 30 27 30 30
+     [26] 30 30 30 28 22 23 30 30 30 30 30 30 25 27 26 14 29 27 30 30 26 30 16 23 27
+     [51] 29 26 30 30 29 30 29 23 23 30 26 24 27 30 15 30 28 29 17 29 30 30 22 30 28
+     [76] 28 30 29 27 26 30 30 24 17 30 29 30 29 23 30 30 30 30 28 29 29 17 30 30 28
+
+    $entry_stats$duration
+      [1] 30 16 28 28 30 28 27 25 28 30 30 29 10 30 25 29 30 24 30 30 28 30 27 30 30
+     [26] 30 30 30 28 22 23 30 30 30 30 30 29 25 26 25 14 29 27 30 30 24 30 16 23 27
+     [51] 29 26 30 30 25 30 29 22 23 30 25 24 25 30 15 30 28 29 16 23 27 30 18 30 28
+     [76] 28 30 29 26 26 30 30 24  9 30 29 30 29 23 30 29 30 30 28 29 28 16 30 30 27
+
+    $entry_stats$prop_never_observed
+    [1] 0
+
+    $entry_stats$prop_enter_after_1
+    [1] 0.2
+
+    $entry_stats$mean_FY
+    [1] 1.43
+
+    $entry_stats$median_FY
+    [1] 1
+
+    $entry_stats$mean_duration
+    [1] 26.82
+
+    $entry_stats$median_duration
+    [1] 29
+
+
+    $trend_entry
+    NULL
+
     $cor_I_r_by_year
      [1] 0.037 0.195 0.247 0.147 0.127 0.125 0.050 0.221 0.034 0.145 0.210 0.397
     [13] 0.156 0.227 0.165 0.247 0.175 0.359 0.457 0.363 0.459 0.320 0.338 0.361
@@ -430,6 +510,46 @@ plot_species_trends(out, species = c(1, 5, 9), scale = "index")
 ```
 
 <img src="README_files/figure-gfm/unnamed-chunk-5-5.png" style="display: block; margin: auto;" />
+
+And the same model run without the imputation for the Bayesian geomean:
+
+``` r
+out2 <- run_full_analysis(data_source = "simulate",
+                         sim_args = sim_args,
+                         fit_models = c("partial","freeman", "nopool", "bayes_geomean"),
+                         ## Model-specific settings (ovm = 2)
+                         jags_partial = list(df_mu=6, obs_var_model=4, n_iter=500, n_burn=100),
+                         jags_nopool = list(df_mu=6, obs_var_model=4, n_iter=500, n_burn=100),
+                         jags_freeman = list(obs_var_model=4, n_iter=500, n_burnin=100),
+                         jags_bayes_geomean = list(obs_var_model=4, n_iter=500, n_burnin=100),
+                         # smoothed version of Bayesian geomean?
+                         smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
+                         plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
+                         # impute missing spp/year combinations
+                         impute_all_geomean = FALSE, # if false, then under MNAR this estimand differs from other models
+                         ## Cross-model settings (seFromData not really needed here as ovm = 2 above)
+                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=FALSE, m.scale = "loge"),
+                         ## Growth-rate presentation scale
+                         growth_scale = "log",
+                         quiet = TRUE) # suppress JAGS output to console
+
+# Indicator plots
+print(out2$plots$MSI) # M_prime equivalents
+```
+
+<img src="README_files/figure-gfm/unnamed-chunk-6-1.png" style="display: block; margin: auto;" />
+
+``` r
+print(out2$plots$CumLog) # M equivalents where applicable
+```
+
+<img src="README_files/figure-gfm/unnamed-chunk-6-2.png" style="display: block; margin: auto;" />
+
+``` r
+print(out2$plots$Growth) # annual growth on scale specified in run_full_analysis()
+```
+
+<img src="README_files/figure-gfm/unnamed-chunk-6-3.png" style="display: block; margin: auto;" />
 
 ## References
 

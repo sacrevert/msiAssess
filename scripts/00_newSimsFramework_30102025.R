@@ -1227,8 +1227,8 @@ as_sim_from_empirical <- function(index_mat, se_mat = NULL, years = NULL,
   
   list(
     years = years %||% seq_len(ny),
-    y     = idx_loge,
-    se    = se_loge,
+    y = idx_loge,
+    se = se_loge,
     l_true = NULL, mu_true = NULL,
     delta_true = rep(0, ny - 1),
     gamma_s = rep(0, nsp),

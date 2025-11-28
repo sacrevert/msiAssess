@@ -9,6 +9,7 @@
 .DS_Store
 /cache/
 /output/
+/data/fionaDat
 /tmp/
 harvard.csl
 references.bib

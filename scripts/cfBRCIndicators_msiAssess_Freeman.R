@@ -5,6 +5,9 @@ library(BRCindicators)
 #install_github(repo = 'biologicalrecordscentre/BRCindicators')
 offDat <- read.csv(file = "data/fionaDat/d4a_spp_ts_engto23_Smoothed_unsmVP.csv")
 head(offDat)
+offDatSE <- read.csv(file = "data/fionaDat/d4_spp_timeseries_engto23.csv")
+head(offDatSE)
+head(offDat[offDat$species=="acanthis cabaret",])
 
 # following the DataLabs process
 data <- offDat

@@ -1,0 +1,15 @@
+.Rproj.user
+.Rhistory
+.RData
+.RDataTmp
+.RDataTmp1
+.Ruserdata
+.Renviron
+.env
+.DS_Store
+/cache/
+/outputs/
+/data/fionaDat
+/tmp/
+harvard.csl
+references.bib

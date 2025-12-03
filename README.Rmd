@@ -1,0 +1,287 @@
+---
+title: "msiAssess"
+output: github_document
+bibliography: references.bib
+csl: harvard.csl
+link-citations: true
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+library(here)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  results = "markup",
+  message = FALSE,
+  warning = FALSE,
+  error = FALSE,
+  comment = NA,
+  fig.align = "center",
+  fig.width = 6, fig.height = 4
+)
+
+options(here.quiet = TRUE)
+here::i_am("README.Rmd")
+knitr::opts_knit$set(root.dir = here::here())
+source(file = here("scripts/00_newSimsFramework_30102025.R"))
+```
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+msiAssess allows the user to fit a set of Bayesian models for multi-species (biodiversity) indicators to both simulated and empirical data. The models will be explained in detail elsewhere, but include a version of Freeman's "generic method" [@freemanGenericMethod2021] that allows for variably observed species' index standard errors, and a Bayesian version of Soldaat's Monte Carlo method [@soldaatMonteCarlo2017] with user-controlled in-model imputation of missing data. Two novel Bayesian model types ("no pooling" and "partial pooling" models of growth-rates with common annual species-level "shocks") are also included for comparative purposes.
+
+The simulation framework gives the user control over a range of parameters, and allows for the inclusion of missingness patterns that are "Missing Not At Random" (MNAR) as a test of how the different MSIs perform when their assumptions (e.g. species Missing At Random [MAR] conditional on the model structure) are violated to varying degrees, as is quite common when heterogeneous data sources are combined in MSIs, and/or when species time-series exhibit strong time-varying biases (e.g. @boydUsingCausal2025).
+
+## Basic usage
+
+A wrapper function `run_full_analysis()` is provided for convenience, although the constituent parts can also be run separately. For simulated data, it is most convenient to specify the simulation settings via a list that is then passed to `run_full_analysis()`.
+
+```{r}
+## Specify simulation settings
+sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
+                 ## Growth rate data-generating process (DGP)
+                 dgp_mode = "spline", # "spline","rw","ar1","changepoint","seasonal","mixture"
+                 ## DGP options (sub-options apply to specific DGPs as stated)
+                 # spline options
+                 df_mu = 6, # default
+                 # RW / AR1
+                 sigma_eta = 0.05, phi = 0.7,
+                 # changepoint
+                 n_cp = 2, jump_sd = 0.15, piecewise_linear = FALSE,
+                 # seasonal
+                 A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
+                 # mixture of random walks
+                 K_guilds = 5, # number of groups
+                 # time-series entry mode
+                 entry_mode = c("none"),
+                 ## Simulate species/observation options (cross-DGP)
+                 # species/state variation
+                 sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
+                 innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t only)
+                 sp_trend = "none", # "none" or "random_slope"
+                 sigma_gamma = 0.05, log_sd_se = 0.35, 
+                 use_delta = FALSE, # cross-species annual shocks?
+                 # observation model
+                 sigma_obs_mean = 0.02, prop_missing = 0,
+                 # Inclusion MNAR (additional to prop_missing)
+                 inclusion_bias = list(enabled = FALSE, # include inclusion bias?
+                                       a0 = -0.4, # parameters for Bernoulli model of MNAR bias
+                                       a1 = 3.0,
+                                       rho1 = 1.2,
+                                       rho0 = 0.2,
+                                       p_init = 1))
+```
+
+These will be described in more detail when the code is incorporated into an R package, although inspection of the `generate_mu()` and `simulate_species_data()` functions' code should make it clear what each option is doing.
+
+The other options passed to `run_full_analysis()` are briefly described in code comments below.
+
+```{r}
+out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
+                         sim_args = sim_args, # as above
+                         # which models to run?
+                         fit_models = c("partial","freeman", "nopool","bayes_geomean"),
+                         ## Model-specific settings
+                         jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+                         jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+                         jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
+                         jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
+                         # smoothed version of Bayesian geomean?
+                         smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
+                         plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
+                         # impute missing spp/year combinations
+                         impute_all_geomean = T, # if false, then under MNAR this estimand differs from other models
+                         plot_MNAR = TRUE, # plot sampled-only truth alongside *actual* truth
+                         ## Cross-model settings
+                         # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
+                         # but only if obs_var_model not specified
+                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=TRUE, m.scale = "loge"),
+                         ## Growth-rate presentation scale (model returns both anyway, this is for plot)
+                         growth_scale = "log",
+                         quiet = TRUE) # suppress JAGS output here 
+```
+
+## "Perfect" data scenario (no missingness)
+In this example we are using a spline-based data-generating process (DGP) for the underlying growth rates. This is congenial to the actual models (i.e. the DGP assumed by the models is actually true). We are not including any MNAR missingness, or any missingness at all. In general we expect all models to index "truth" very closely in this scenario. Indeed, all models overlie the "truth" for all metrics with high confidence. (Note that these examples are all run with very short MCMC chains.)
+
+```{r}
+# Check convergence (preview only)
+head(out$checks$freeman$bad) # all models are included at out$checks level
+
+# Indicator plots
+print(out$plots$MSI) # M_prime equivalents
+print(out$plots$CumLog) # M equivalents where applicable
+print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
+
+# Inclusion diagnostics (e.g. for comparing MNAR strength to empirical examples)
+evaluate_inclusion_process(out$sim) # Not informative for perfect sample with no drop-out
+
+## Spp trends (grey line = latent process; blue dot = noisy obs with missingness
+# Plot 12 randomly chosen species on log scale
+plot_species_trends(out, n_sample = 12, scale = "log")
+# Plot specific species (by index) as baseline-1 indices
+plot_species_trends(out, species = c(1, 5, 9), scale = "index")
+```
+
+## "Imperfect" data scenario (MNAR missingness)
+Note that here missing species/year index combinations are being imputed for the Bayesian geomean (`impute_all_geomean = T`). If we switched this to `FALSE`, then the estimand is no longer comparable to the other methods.
+
+```{r}
+sim_args <- list(n_species = 100, n_years = 30, seed = 232680,
+                 ## Growth rate DGP
+                 dgp_mode = "mixture",
+                 ## DGP options for mixture
+                 # RW / AR1
+                 sigma_eta = 0.05, phi = 0.7,
+                 # mixture of random walks
+                 K = 5, # number of groups
+                 # time-series entry mode
+                 entry_mode = c("none"),
+                 ## Simulate species options
+                 # species/state variation
+                 sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
+                 innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t)
+                 sp_trend = "random_slope", sigma_gamma = 0.05, log_sd_se = 0.35, # random slopes this time
+                 use_delta = FALSE, # cross-species annual shocks?
+                 # observation model
+                 sigma_obs_mean = 0.05, prop_missing = 0.2,
+                 # Inclusion MNAR (additional to prop_missing)
+                 inclusion_bias = list(enabled = TRUE, # include inclusion bias?
+                                       a0 = -0.5, 
+                                       a1 = 3.0,
+                                       rho1 = 1.5,
+                                       rho0 = 0.1,
+                                       p_init = 1))
+out <- run_full_analysis(data_source = "simulate",
+                         sim_args = sim_args,
+                         fit_models = c("partial","freeman", "nopool", "bayes_geomean"),
+                         ## Model-specific settings (ovm = 2)
+                         jags_partial = list(df_mu=6, obs_var_model=4, n_iter=500, n_burn=100),
+                         jags_nopool = list(df_mu=6, obs_var_model=4, n_iter=500, n_burn=100),
+                         jags_freeman = list(obs_var_model=4, n_iter=500, n_burnin=100),
+                         jags_bayes_geomean = list(obs_var_model=4, n_iter=500, n_burnin=100),
+                         # smoothed version of Bayesian geomean?
+                         smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
+                         plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
+                         # impute missing spp/year combinations
+                         impute_all_geomean = T, # if false, then under MNAR this estimand differs from other models
+                         ## Cross-model settings (seFromData not really needed here as ovm = 2 above)
+                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=FALSE, m.scale = "loge"),
+                         ## Growth-rate presentation scale
+                         growth_scale = "log",
+                         quiet = TRUE) # suppress JAGS output to console
+
+# Indicator plots
+print(out$plots$MSI) # M_prime equivalents
+print(out$plots$CumLog) # M equivalents where applicable
+print(out$plots$Growth) # annual growth on scale specified in run_full_analysis()
+
+# Inclusion diagnostics (e.g. for comparing MNAR strength to empirical examples)
+evaluate_inclusion_process(out$sim)
+
+## Spp trends (grey line = latent process; blue dot = noisy obs with missingness
+# Plot 12 randomly chosen species on log scale
+plot_species_trends(out, n_sample = 12, scale = "log")
+# Plot specific species (by index) as baseline-1 indices
+plot_species_trends(out, species = c(1, 5, 9), scale = "index")
+```
+
+And the same model run without the imputation for the Bayesian geomean:
+
+```{r}
+out2 <- run_full_analysis(data_source = "simulate",
+                         sim_args = sim_args,
+                         fit_models = c("partial","freeman", "nopool", "bayes_geomean"),
+                         ## Model-specific settings (ovm = 2)
+                         jags_partial = list(df_mu=6, obs_var_model=4, n_iter=500, n_burn=100),
+                         jags_nopool = list(df_mu=6, obs_var_model=4, n_iter=500, n_burn=100),
+                         jags_freeman = list(obs_var_model=4, n_iter=500, n_burnin=100),
+                         jags_bayes_geomean = list(obs_var_model=4, n_iter=500, n_burnin=100),
+                         # smoothed version of Bayesian geomean?
+                         smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
+                         plot_geomean = TRUE, # plot unsmoothed Bayes geomean MSI
+                         # impute missing spp/year combinations
+                         impute_all_geomean = FALSE, # if false, then under MNAR this estimand differs from other models
+                         ## Cross-model settings (seFromData not really needed here as ovm = 2 above)
+                         brc_opts = list(num_knots=12, seFromData=TRUE, Y1perfect=FALSE, m.scale = "loge"),
+                         ## Growth-rate presentation scale
+                         growth_scale = "log",
+                         quiet = TRUE) # suppress JAGS output to console
+
+# Indicator plots
+print(out2$plots$MSI) # M_prime equivalents
+print(out2$plots$CumLog) # M equivalents where applicable
+print(out2$plots$Growth) # annual growth on scale specified in run_full_analysis()
+```
+
+## Comparing `msiAssess` to `BRCIndicators` Freeman implementation
+Here we take the simulated MNAR data above and run both the Freeman model from `BRCindicators` and the `msiAssess` implementation with the same settings. Allowing for minor differences in implementation (largely those designed to provide `msiAssess` with more flexibility to handle variably missing SEs and species' time-series entry points), the `msiAssess` method essentially returns the same result (note that ordinary Monte Carlo error will also be evident in short MCMC runs like those given here).
+
+```{r}
+# assume out2$sim$y  is S × T  matrix of log indices
+Y <- out2$sim$y
+years <- out2$sim$years
+species <- rownames(Y) %||% paste0("sp", seq_len(nrow(Y)))
+colnames(Y) <- paste0("year.", years)
+df_wide <- data.frame(species = species, Y)
+df_long <- reshape(df_wide,
+                   direction = "long",
+                   varying = list(names(df_wide)[-1]),
+                   v.names = "index",
+                   timevar = "year",
+                   times = years)
+row.names(df_long) <- NULL
+head(df_long, n = 3); tail(df_long, n = 3)
+# run data through BRCindicators
+mod <- BRCindicators::bma(data = df_long, 
+                          num.knots = 12, m.scale = "loge",
+                          parallel = TRUE,
+                          seFromData = FALSE,
+                          Y1perfect = TRUE,
+                          plot = FALSE,
+                          n.iter = 1000, seed = 232680)
+# Rerun msiAssess for comparability
+out3 <- run_full_analysis(data_source = "simulate",
+                          # same settings as used for out2 model above
+                         sim_args = sim_args,
+                         fit_models = "freeman",
+                         # for comparability with BRCindicators settings (burn in = floor(n.iter/2))
+                         jags_freeman = list(obs_var_model=4, n_iter=1000, n_burnin=500),
+                         brc_opts = list(num_knots=12, seFromData=FALSE, Y1perfect=TRUE, m.scale = "loge"),
+                         quiet = TRUE)
+
+## Extract msiAssess Freeman Mprime summary (log scale, posterior_summary structure)
+mpr <- out3$results$freeman$Mprime
+
+# Convert to index scale, baseline = 100 at first year
+mpr_med <- as.numeric(mpr$median)
+mpr_lower <- as.numeric(mpr$lower)
+mpr_upper <- as.numeric(mpr$upper)
+idx_freeman_med <- (exp(mpr_med   - mpr_med[1]))*100
+idx_freeman_lower <- (exp(mpr_lower - mpr_med[1]))*100
+idx_freeman_upper <- (exp(mpr_upper - mpr_med[1]))*100
+
+## Base plot: BRCIndicators Mprime index
+yr <- mod$Year
+plot(yr, mod$Index.Mprime,
+     type = "l", lwd = 2,
+     xlab = "Year", ylab = "Index (baseline = 100)",
+     ylim = range(c(mod$Index.Mprime, mod$lowerCI.Mprime, mod$upperCI.Mprime, idx_freeman_lower, idx_freeman_upper), na.rm = TRUE))
+legend("topright",
+       legend = c("BRCIndicators Freeman", "BRCIndicators Freeman (95% CI)", "msiAssess Freeman (median)", "msiAssess Freeman (95% CI)"),
+       col    = c("black", "black", "red", "red"),
+       lwd    = c(2, 1, 2, 1),
+       lty    = c(1, 2, 1, 2),
+       bty    = "n")
+## Add BRCIndicator CIs and Freeman msiAssess curve + 95% bands
+lines(yr, mod$lowerCI.Mprime, col = "black", lty = 2)
+lines(yr, mod$upperCI.Mprime, col = "black", lty = 2)
+lines(yr, idx_freeman_med, col = "red", lwd = 2)
+lines(yr, idx_freeman_lower, col = "red", lty = 2)
+lines(yr, idx_freeman_upper, col = "red", lty = 2)
+```
+
+
+## References

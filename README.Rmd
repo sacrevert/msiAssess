@@ -282,10 +282,10 @@ lines(yr, idx_freeman_med, col = "red", lwd = 2)
 lines(yr, idx_freeman_lower, col = "red", lty = 2)
 lines(yr, idx_freeman_upper, col = "red", lty = 2)
 ```
-Look at Rhat stats for `msiAssess` model run; not available for `BRCIndicators`: see issue (here)[https://github.com/BiologicalRecordsCentre/BRCindicators/issues/90]. It's worth noting here that the global SE parameter, `theta`, is far from converging. The same behaviour has been observed with an empirical dataset with longer chains (`n_iter = 1000`).
+Look at Rhat stats for `msiAssess` model run; not available for `BRCIndicators`: see issue [here](https://github.com/BiologicalRecordsCentre/BRCindicators/issues/90). It's worth noting here that the global SE parameter, `theta`, is far from converging. The same behaviour has been observed with an empirical dataset with longer chains (`n_iter = 1000`).
 
 ```{r}
-head(out3$checks$freeman$table, n = 5)
+head(out3$checks$freeman$table[,c(8:10)], n = 5)
 ```
 
 

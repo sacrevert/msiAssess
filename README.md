@@ -658,27 +658,21 @@ lines(yr, idx_freeman_upper, col = "red", lty = 2)
 <img src="README_files/figure-gfm/unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
 Look at Rhat stats for `msiAssess` model run; not available for
 `BRCIndicators`: see issue
-(here)\[<https://github.com/BiologicalRecordsCentre/BRCindicators/issues/90>\].
+[here](https://github.com/BiologicalRecordsCentre/BRCindicators/issues/90).
 It’s worth noting here that the global SE parameter, `theta`, is far
 from converging. The same behaviour has been observed with an empirical
 dataset with longer chains (`n_iter = 1000`).
 
 ``` r
-head(out3$checks$freeman$table, n = 5)
+head(out3$checks$freeman$table[,c(8:10)], n = 5)
 ```
 
-                      mean           sd          2.5%           25%           50%
-    deviance -1.155354e+04 9.134937e+02 -1.333388e+04 -1.224716e+04 -1.135795e+04
-    theta     8.295889e-03 2.620506e-03  4.019864e-03  6.098216e-03  8.459837e-03
-    b[11]    -5.874169e-03 1.472362e-01 -2.303500e-01 -1.761382e-02 -5.330159e-05
-    b[10]    -8.552200e-03 1.522105e-01 -2.318233e-01 -1.861510e-02 -1.231546e-03
-    b[1]      5.314989e-02 2.240501e-01 -5.393030e-02 -1.205079e-03  9.194363e-03
-                       75%         97.5%     Rhat n.eff    param
-    deviance -1.079503e+04 -1.026994e+04 3.187187     4 deviance
-    theta     1.034406e-02  1.296867e-02 3.134380     4    theta
-    b[11]     1.293949e-02  3.232630e-01 1.200830   300    b[11]
-    b[10]     1.111488e-02  2.104698e-01 1.195896   300    b[10]
-    b[1]      4.746490e-02  4.004054e-01 1.185482   150     b[1]
+                 Rhat n.eff    param
+    deviance 3.187187     4 deviance
+    theta    3.134380     4    theta
+    b[11]    1.200830   300    b[11]
+    b[10]    1.195896   300    b[10]
+    b[1]     1.185482   150     b[1]
 
 ## References
 

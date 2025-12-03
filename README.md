@@ -656,14 +656,9 @@ lines(yr, idx_freeman_upper, col = "red", lty = 2)
 ```
 
 <img src="README_files/figure-gfm/unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
-Look at Rhat stats for `msiAssess` model run; not available for
-`BRCIndicators`: see issue
-[here](https://github.com/BiologicalRecordsCentre/BRCindicators/issues/90).
-It’s worth noting here that the global SE parameter, `theta`, is far
-from converging. The same behaviour has been observed with an empirical
-dataset with longer chains (`n_iter = 1000`).
 
 ``` r
+## Also look at Rhats for theta
 head(out3$checks$freeman$table[,c(8:10)], n = 5)
 ```
 
@@ -673,6 +668,13 @@ head(out3$checks$freeman$table[,c(8:10)], n = 5)
     b[11]    1.200830   300    b[11]
     b[10]    1.195896   300    b[10]
     b[1]     1.185482   150     b[1]
+
+Note also the Rhat stats for `msiAssess` model run (these are not
+available for `BRCIndicators`: see issue
+[here](https://github.com/BiologicalRecordsCentre/BRCindicators/issues/90)
+). The global SE parameter, `theta`, is far from converging. The same
+behaviour has been observed with an empirical dataset with longer
+chains, namely `n_iter = 1000`.
 
 ## References
 

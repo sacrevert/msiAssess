@@ -240,6 +240,7 @@ mod <- BRCindicators::bma(data = df_long,
                           parallel = TRUE,
                           seFromData = FALSE,
                           Y1perfect = TRUE,
+                          errorY1 = TRUE,
                           plot = FALSE,
                           n.iter = 1000, seed = 232680)
 # Rerun msiAssess for comparability

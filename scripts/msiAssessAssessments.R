@@ -31,7 +31,7 @@ assess_interval_change_from_draws <- function(draws,
   }
   if (id1 == id2) stop("year1 and year2 must be different.")
   
-  # We keep the (year1, year2) ordering as given by the user.
+  # keep the (year1, year2) ordering as given by the user.
   if (scale == "log") {
     ## draws are X_t on log scale; difference is log-ratio
     log_diff <- draws[, id2] - draws[, id1]
@@ -109,13 +109,10 @@ print.msi_interval_assess <- function(x, digits = 3, ...) {
   invisible(x)
 }
 
-## Convenience wrapper: interval assessment for Freeman M'
+## Convenience wrapper: interval assessment for Freeman M_prime
 ## out: object returned by run_full_analysis(...), with a Freeman fit
 ## year1, year2: years to compare (must match out$sim$years)
-assess_freeman_Mprime_change <- function(out,
-                                       year1,
-                                       year2,
-                                       prob = 0.95) {
+assess_freeman_Mprime_change <- function(out, year1, year2, prob = 0.95) {
   if (is.null(out$fits$freeman)) {
     stop("No Freeman fit found in `out$fits$freeman`.")
   }
@@ -126,8 +123,8 @@ assess_freeman_Mprime_change <- function(out,
     stop("Freeman fit does not contain `Mprime` in sims.list.")
   }
   
-  draws <- sims$Mprime          # iterations x T (log mean index across spp)
-  years <- out$sim$years        # time labels
+  draws <- sims$Mprime # iterations x T (log mean index across spp)
+  years <- out$sim$years # time labels
   
   estimand_label <- paste(
     "Change in the mean log-index M_prime across species between year1 and year2,",
@@ -136,12 +133,12 @@ assess_freeman_Mprime_change <- function(out,
   )
   
   assess_interval_change_from_draws(
-    draws          = draws,
-    years          = years,
-    year1          = year1,
-    year2          = year2,
-    scale          = "log",
-    prob           = prob,
+    draws = draws,
+    years = years,
+    year1 = year1,
+    year2 = year2,
+    scale = "log",
+    prob = prob,
     estimand_label = estimand_label
   )
 }
@@ -153,24 +150,24 @@ assess_freeman_Mprime_change <- function(out,
 # res1 <- assess_freeman_Mprime_change(out, year1 = min(out$sim$years), year2 = max(out$sim$years))
 # print(res1)
 # 
-# # Test net change over a shorter interval, say 2000–2010
+# # Assess net change over a shorter interval, say 2000–2010
 # res2 <- assess_freeman_Mprime_change(out, year1 = 2000, year2 = 2010)
 # print(res2)
 
-# ## Partial JAGS model (two options, M_smooth and M_full)
-# # Structural trend-only:
-# draws_trend <- out$fits$partial$BUGSoutput$sims.list$M_smooth  # log scale
-# assess_interval_change_from_draws(draws_trend, out$sim$years, 1990, 2020,
-#                                 scale = "log",
-#                                 estimand_label = "Change in common log-index M_smooth (trend only)"
-# )
-# 
-# # Trend + shocks:
-# draws_full <- out$fits$partial$BUGSoutput$sims.list$M_full
-# assess_interval_change_from_draws(draws_full, out$sim$years, 1990, 2020,
-#                                 scale = "log",
-#                                 estimand_label = "Change in common log-index M_full (trend + common shocks)"
-# )
+## Partial JAGS model (two options, M_smooth and M_full)
+# Structural trend-only:
+draws_trend <- out$fits$partial$BUGSoutput$sims.list$M_smooth  # log scale
+assess_interval_change_from_draws(draws_trend, out$sim$years, 2, 28,
+                                scale = "log",
+                                estimand_label = "Change in common log-index M_smooth (trend only)"
+)
+
+# Trend + shocks:
+draws_full <- out$fits$partial$BUGSoutput$sims.list$M_full
+assess_interval_change_from_draws(draws_full, out$sim$years, 2, 28,
+                                scale = "log",
+                                estimand_label = "Change in common log-index M_full (trend + common shocks)"
+)
 # 
 # ## Bayesian geomean MSI (Soldaat-type)
 # draws_msi <- out$fits$bayes_geomean$BUGSoutput$sims.list$MSI  # index scale
@@ -180,14 +177,28 @@ assess_freeman_Mprime_change <- function(out,
 # )
 # 
 # ## Post-smoothed MSI or M'
-# # (e.g. schematically)
+# # (schematic example)
 # # Suppose 'Mprime_sm_draws' is iterations x T of smoothed M' (log scale)
-# res_sm <- assess_interval_change_from_draws(
-#   draws          = Mprime_sm_draws,
-#   years          = out$sim$years,
-#   year1          = 1990,
-#   year2          = 2020,
-#   scale          = "log",
-#   estimand_label = "Change in post-smoothed mean log-index M_prime"
-# )
-
+freeman_Mprime_smooth <- posthoc_smooth_Mprime(
+  fit = out$fits$freeman,
+  years = out$sim$years,
+  basis = "ruppert",
+  num_knots = 12
+)
+out$results$freeman_Mprime_smooth <- freeman_Mprime_smooth
+MSI_list <- list(
+  Freeman_raw = out$results$freeman$MSI,
+  Freeman_Mp_S = freeman_Mprime_smooth$MSI
+)
+p_MSI <- plot_indicator(out$sim$years, MSI_list, truths = NULL,
+                        title = "Freeman MSI: raw vs post-smoothed M'")
+print(p_MSI)
+res_sm <- assess_interval_change_from_draws(
+  draws = freeman_Mprime_smooth$MSI_sm_draws,
+  years = out$sim$years,
+  year1 = 1,
+  year2 = 30,
+  scale = "log",
+  estimand_label = "Change in post-smoothed mean log-index M_prime"
+)
+print(res_sm)

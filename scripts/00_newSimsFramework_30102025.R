@@ -655,6 +655,55 @@ model {
   }) |> t() # returns draws x (T-1)
 }
 
+smooth_species_ruppert <- function(sim,
+                                   df_per_point = 0.3,
+                                   max_knots = 12) {
+  Y <- sim$y # S x T, already on loge scale for simulations
+  years <- sim$years
+  nsp <- nrow(Y); ny <- ncol(Y)
+  Y_smooth <- matrix(NA_real_, nsp, ny)
+  
+  for (s in seq_len(nsp)) {
+    y <- Y[s, ]
+    ok <- is.finite(y)
+    t_ok <- years[ok]
+    y_ok <- y[ok]
+    n_ok <- sum(ok)
+    
+    # Too few points -> no smoothing
+    if (n_ok <= 3L) {
+      Y_smooth[s, ] <- y
+      next
+    }
+    
+    # Target df ~ df_per_point * n_ok; total basis dimension = 2 + num_knots
+    df_target <- max(3L, round(df_per_point * n_ok))
+    num_knots <- max(1L, min(max_knots, df_target - 2L))
+    
+    # Build basis on observed times only
+    basis <- build_ruppert_basis(t = t_ok, num_knots = num_knots)
+    Z <- basis$Z                    # n_ok x num_knots
+    
+    # Choose lambda by GCV, then smooth y_ok with ridge penalty
+    lam <- .choose_lambda_gcv(y_ok, Z)
+    
+    # Ridge smoother: same algebra as in .smooth_growth_draws()
+    Zc <- scale(Z, center = TRUE, scale = FALSE)
+    ZZ <- crossprod(Zc)
+    P  <- solve(ZZ + diag(lam, ncol(Zc)), tol = 1e-10)
+    Bx <- P %*% t(Zc) # num_knots x n_ok
+    yc <- y_ok - mean(y_ok)
+    b  <- Bx %*% yc
+    yhat_ok <- as.vector(Zc %*% b + mean(y_ok))
+    
+    # Insert smoothed values back into full T-vector, leave missing as NA
+    yhat <- y
+    yhat[ok] <- yhat_ok
+    Y_smooth[s, ] <- yhat
+  }
+  Y_smooth
+}
+
 # post-hoc smoothing for Bayes geomean
 posthoc_smooth_bayes_geomean <- function(fit, years, impute_all,
                                          basis = c("auto","ruppert","ns"),
@@ -708,6 +757,78 @@ posthoc_smooth_bayes_geomean <- function(fit, years, impute_all,
     lambda = lam,
     basis = basis_used,
     impute_all = impute_all
+  )
+}
+
+## Post-hoc smoother for Freeman M' (mean log index)
+## Uses posterior draws of Mprime from a Freeman/JAGS fit.
+posthoc_smooth_Mprime <- function(fit, years,
+                                  basis = c("auto","ruppert","ns"),
+                                  df_mu = 6, num_knots = 12) {
+  basis <- match.arg(basis)
+  sims  <- fit$BUGSoutput$sims.list
+  
+  if (is.null(sims$Mprime)) {
+    stop("fit$BUGSoutput$sims.list$Mprime not found; ensure 'Mprime' is monitored in the JAGS model.")
+  }
+  
+  Mprime <- sims$Mprime # iterations x T (mean log index)
+  T      <- length(years)
+  if (ncol(Mprime) != T) {
+    stop("Time dimension mismatch: ncol(Mprime) != length(years).")
+  }
+  
+  # 1) Growth of M_prime (differences of mean log index)
+  #    dM[i, t] = M_prime(t+1) - M'(t)  for t = 1..T-1
+  dM <- Mprime[, -1, drop = FALSE] - Mprime[, -T, drop = FALSE]  # draws x (T-1)
+  
+  # Build growth-year basis Z ((T-1) x K)
+  Z <- NULL
+  basis_used <- NULL
+  
+  if (basis %in% c("auto","ruppert")) {
+    # clamp knots so we have at least a few residual df
+    nk_eff <- max(1L, min(num_knots, (T - 1L) - 2L))
+    Z_try  <- try(build_ruppert_basis(t = 1:(T - 1L),
+                                      num_knots = nk_eff)$Z,
+                  silent = TRUE)
+    if (!inherits(Z_try, "try-error")) {
+      Z <- Z_try
+      basis_used <- sprintf("ruppert[%d]", nk_eff)
+    }
+  }
+  if (is.null(Z)) {
+    # fallback to ns basis if Ruppert fails / is infeasible
+    df_eff <- max(1L, min(df_mu, (T - 1L) - 1L))
+    Z <- make_basis(years, df_mu = df_eff)
+    basis_used <- sprintf("ns[df=%d]", df_eff)
+  }
+  
+  # Choose lambda by GCV on a 'typical' (median) growth trajectory
+  lam <- .choose_lambda_gcv(
+    y = apply(dM, 2, stats::median, na.rm = TRUE),
+    Z = Z
+  )
+  
+  # Smooth all growth draws with fixed lambda
+  #    mu_sm: draws x (T-1), smoothed log-growth of M'
+  mu_sm <- .smooth_growth_draws(Gmat = dM, Z = Z, lambda = lam)
+  
+  # Re-integrate to cumulative log scale, baseline at 0
+  #    M_sm[i,1] = 0, M_sm[i,t] = sum_{u< t} mu_sm[i,u]
+  M_sm <- cbind(0, t(apply(mu_sm, 1, cumsum)))  # draws x T
+  
+  # Smoothed MSI: exp(M_sm - M_sm[,1]) gives baseline = 1
+  MSI_sm_draws <- exp(M_sm - M_sm[, 1])
+  
+  list(
+    Lambda = posterior_summary(mu_sm), # smoothed log-growth of M_prime
+    Gexp   = posterior_summary(exp(mu_sm)), # multiplicative growth of M_prime
+    M      = posterior_summary(M_sm), # cumulative log-scale M_prime (up to an additive constant)
+    MSI    = posterior_summary(MSI_sm_draws), # smoothed MSI path, baseline = 1
+    lambda = lam,
+    basis  = basis_used,
+    source = "Mprime"
   )
 }
 

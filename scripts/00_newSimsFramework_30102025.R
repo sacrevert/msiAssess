@@ -1956,69 +1956,69 @@ filter_indicator_plot <- function(p,
 }
 
 # 13) Example usage ####
-sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
-                 ## Growth rate DGP
-                 dgp_mode = "spline", # "spline","rw","ar1","changepoint","seasonal","mixture"
-                 ## DGP options
-                 # spline options
-                 df_mu = 6, # default
-                 # RW / AR1
-                 sigma_eta = 0.05, phi = 0.7,
-                 # changepoint
-                 n_cp = 2, jump_sd = 0.15, piecewise_linear = FALSE,
-                 # seasonal
-                 A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
-                 # mixture of random walks
-                 K_guilds = 5, # number of groups
-                 # species time-series entry mode (guild_staggered for mixture DGP)
-                 entry_mode = c("none"),
-                 ## Simulate species options
-                 # species/state variation
-                 sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
-                 innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t)
-                 sp_trend = "none", sigma_gamma = 0.05, log_sd_se = 0.35, # "none" or "random_slope"
-                 use_delta = FALSE, # Use cross-species annual shocks?
-                 # observation model
-                 sigma_obs_mean = 0.2,
-                 prop_missing = 0, # set to 0 if using approx_a0_for_target_pi() for MNAR
-                 ## Inclusion MNAR (additional to prop_missing)
-                 # setting use_delta = T means cross-spp shocks enter inclusion selection predictor too
-                 inclusion_bias = list(enabled = F, # include inclusion bias?
-                                       a0 = -0.4, # lower = P(inc) down at avg growth
-                                       a1 = 5.0, # higher = P(inc) sensitive to recent growth
-                                       # rho1 - rho0 up = increase stickiness
-                                       rho1 = 1.2,
-                                       rho0 = 0.1,
-                                       p_init = 0.2)) # initial inc prob
-out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
-                         sim_args = sim_args, # as above
-                         #fit_models = NULL, # sim/empirical outs only
-                         #fit_models = c("partial","freeman", "nopool","bayes_geomean"),
-                         #fit_models = c("partial","freeman","bayes_geomean"),
-                         #fit_models = c("partial","freeman", "nopool"),
-                         #fit_models = c("partial"),
-                         fit_models = c("freeman"),
-                         #fit_models = c("freeman","bayes_geomean"),
-                         #fit_models = c("bayes_geomean"),
-                         ## Model-specific settings
-                         jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-                         jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
-                         jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
-                         jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
-                         smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
-                         plot_geomean = FALSE, # plot unsmoothed Bayes geomean MSI
-                         # impute missing spp/year combinations
-                         impute_all_geomean = F, # if false, then under MNAR the estimand differs from other models
-                         plot_MNAR = TRUE, # plot sampled species "truth" alongside actual truth
-                         ## Cross-model settings
-                         # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
-                         # but only if obs_var_model not specified
-                         # m.scale = loge assumes data already on natural log scale
-                         brc_opts = list(num_knots = 12, seFromData = TRUE,
-                                         Y1perfect = FALSE, m.scale = "loge"),
-                         ## Growth-rate presentation scale (model returns both anyway, this is for plot)
-                         growth_scale = "log",
-                         quiet = FALSE) # suppress JAGS output or not
+# sim_args <- list(n_species = 40, n_years = 30, seed = 232680,
+#                  ## Growth rate DGP
+#                  dgp_mode = "spline", # "spline","rw","ar1","changepoint","seasonal","mixture"
+#                  ## DGP options
+#                  # spline options
+#                  df_mu = 6, # default
+#                  # RW / AR1
+#                  sigma_eta = 0.05, phi = 0.7,
+#                  # changepoint
+#                  n_cp = 2, jump_sd = 0.15, piecewise_linear = FALSE,
+#                  # seasonal
+#                  A = 0.15, period = 8, phi0 = runif(1, 0, 2*pi),
+#                  # mixture of random walks
+#                  K_guilds = 5, # number of groups
+#                  # species time-series entry mode (guild_staggered for mixture DGP)
+#                  entry_mode = c("none"),
+#                  ## Simulate species options
+#                  # species/state variation
+#                  sigma_sp = 0.05, sigma_delta = 0.05, sd_alpha0 = 0.4,
+#                  innov_dist = "normal", df_u = 3, # "normal" or "student_t" (df_u for t)
+#                  sp_trend = "none", sigma_gamma = 0.05, log_sd_se = 0.35, # "none" or "random_slope"
+#                  use_delta = FALSE, # Use cross-species annual shocks?
+#                  # observation model
+#                  sigma_obs_mean = 0.2,
+#                  prop_missing = 0, # set to 0 if using approx_a0_for_target_pi() for MNAR
+#                  ## Inclusion MNAR (additional to prop_missing)
+#                  # setting use_delta = T means cross-spp shocks enter inclusion selection predictor too
+#                  inclusion_bias = list(enabled = F, # include inclusion bias?
+#                                        a0 = -0.4, # lower = P(inc) down at avg growth
+#                                        a1 = 5.0, # higher = P(inc) sensitive to recent growth
+#                                        # rho1 - rho0 up = increase stickiness
+#                                        rho1 = 1.2,
+#                                        rho0 = 0.1,
+#                                        p_init = 0.2)) # initial inc prob
+# out <- run_full_analysis(data_source = "simulate", # simulated data or empirical?
+#                          sim_args = sim_args, # as above
+#                          #fit_models = NULL, # sim/empirical outs only
+#                          #fit_models = c("partial","freeman", "nopool","bayes_geomean"),
+#                          #fit_models = c("partial","freeman","bayes_geomean"),
+#                          #fit_models = c("partial","freeman", "nopool"),
+#                          #fit_models = c("partial"),
+#                          fit_models = c("freeman"),
+#                          #fit_models = c("freeman","bayes_geomean"),
+#                          #fit_models = c("bayes_geomean"),
+#                          ## Model-specific settings
+#                          jags_partial = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+#                          jags_nopool = list(df_mu=6, obs_var_model=2, n_iter=500, n_burn=100),
+#                          jags_freeman = list(obs_var_model=2, n_iter=500, n_burnin=100),
+#                          jags_bayes_geomean = list(obs_var_model=2, n_iter=500, n_burnin=100),
+#                          smooth_geomean = list(enable = TRUE, prefer_freeman_basis = FALSE),
+#                          plot_geomean = FALSE, # plot unsmoothed Bayes geomean MSI
+#                          # impute missing spp/year combinations
+#                          impute_all_geomean = F, # if false, then under MNAR the estimand differs from other models
+#                          plot_MNAR = TRUE, # plot sampled species "truth" alongside actual truth
+#                          ## Cross-model settings
+#                          # legacy seFromData overridden by model-specific obs_var_model settings, seFromData = T (or F) sets obs_var_model = 2 (or 4
+#                          # but only if obs_var_model not specified
+#                          # m.scale = loge assumes data already on natural log scale
+#                          brc_opts = list(num_knots = 12, seFromData = TRUE,
+#                                          Y1perfect = FALSE, m.scale = "loge"),
+#                          ## Growth-rate presentation scale (model returns both anyway, this is for plot)
+#                          growth_scale = "log",
+#                          quiet = FALSE) # suppress JAGS output or not
 # ## Convergence report
 # out$checks
 # ## Plots

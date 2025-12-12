@@ -156,18 +156,18 @@ assess_freeman_Mprime_change <- function(out, year1, year2, prob = 0.95) {
 
 ## Partial JAGS model (two options, M_smooth and M_full)
 # Structural trend-only:
-draws_trend <- out$fits$partial$BUGSoutput$sims.list$M_smooth  # log scale
-assess_interval_change_from_draws(draws_trend, out$sim$years, 2, 28,
-                                scale = "log",
-                                estimand_label = "Change in common log-index M_smooth (trend only)"
-)
-
-# Trend + shocks:
-draws_full <- out$fits$partial$BUGSoutput$sims.list$M_full
-assess_interval_change_from_draws(draws_full, out$sim$years, 2, 28,
-                                scale = "log",
-                                estimand_label = "Change in common log-index M_full (trend + common shocks)"
-)
+# draws_trend <- out$fits$partial$BUGSoutput$sims.list$M_smooth  # log scale
+# assess_interval_change_from_draws(draws_trend, out$sim$years, 2, 28,
+#                                 scale = "log",
+#                                 estimand_label = "Change in common log-index M_smooth (trend only)"
+# )
+# 
+# # Trend + shocks:
+# draws_full <- out$fits$partial$BUGSoutput$sims.list$M_full
+# assess_interval_change_from_draws(draws_full, out$sim$years, 2, 28,
+#                                 scale = "log",
+#                                 estimand_label = "Change in common log-index M_full (trend + common shocks)"
+# )
 # 
 # ## Bayesian geomean MSI (Soldaat-type)
 # draws_msi <- out$fits$bayes_geomean$BUGSoutput$sims.list$MSI  # index scale
@@ -177,28 +177,27 @@ assess_interval_change_from_draws(draws_full, out$sim$years, 2, 28,
 # )
 # 
 # ## Post-smoothed MSI or M'
-# # (schematic example)
 # # Suppose 'Mprime_sm_draws' is iterations x T of smoothed M' (log scale)
-freeman_Mprime_smooth <- posthoc_smooth_Mprime(
-  fit = out$fits$freeman,
-  years = out$sim$years,
-  basis = "ruppert",
-  num_knots = 12
-)
-out$results$freeman_Mprime_smooth <- freeman_Mprime_smooth
-MSI_list <- list(
-  Freeman_raw = out$results$freeman$MSI,
-  Freeman_Mp_S = freeman_Mprime_smooth$MSI
-)
-p_MSI <- plot_indicator(out$sim$years, MSI_list, truths = NULL,
-                        title = "Freeman MSI: raw vs post-smoothed M'")
-print(p_MSI)
-res_sm <- assess_interval_change_from_draws(
-  draws = freeman_Mprime_smooth$MSI_sm_draws,
-  years = out$sim$years,
-  year1 = 1,
-  year2 = 30,
-  scale = "log",
-  estimand_label = "Change in post-smoothed mean log-index M_prime"
-)
-print(res_sm)
+# freeman_Mprime_smooth <- posthoc_smooth_Mprime(
+#   fit = out$fits$freeman,
+#   years = out$sim$years,
+#   basis = "ruppert",
+#   num_knots = 12
+# )
+# out$results$freeman_Mprime_smooth <- freeman_Mprime_smooth
+# MSI_list <- list(
+#   Freeman_raw = out$results$freeman$MSI,
+#   Freeman_Mp_S = freeman_Mprime_smooth$MSI
+# )
+# p_MSI <- plot_indicator(out$sim$years, MSI_list, truths = NULL,
+#                         title = "Freeman MSI: raw vs post-smoothed M'")
+# print(p_MSI)
+# res_sm <- assess_interval_change_from_draws(
+#   draws = freeman_Mprime_smooth$MSI_sm_draws,
+#   years = out$sim$years,
+#   year1 = 1,
+#   year2 = 30,
+#   scale = "log",
+#   estimand_label = "Change in post-smoothed mean log-index M_prime"
+# )
+# print(res_sm)

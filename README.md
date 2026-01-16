@@ -598,7 +598,7 @@ mod <- BRCindicators::bma(data = df_long,
                           Y1perfect = TRUE,
                           errorY1 = TRUE,
                           plot = FALSE,
-                          n.iter = 1000, seed = 232680)
+                          n.iter = 500, seed = 232680)
 ```
 
 
@@ -621,7 +621,7 @@ out3 <- run_full_analysis(data_source = "simulate",
                          sim_args = sim_args,
                          fit_models = "freeman",
                          # for comparability with BRCindicators settings (burn in = floor(n.iter/2))
-                         jags_freeman = list(obs_var_model=4, n_iter=1000, n_burnin=500),
+                         jags_freeman = list(obs_var_model=4, n_iter=500, n_burnin=250),
                          brc_opts = list(num_knots=12, seFromData=FALSE, Y1perfect=TRUE, m.scale = "loge"),
                          quiet = TRUE)
 
@@ -660,22 +660,26 @@ lines(yr, idx_freeman_upper, col = "red", lty = 2)
 
 ``` r
 ## Also look at Rhats for theta
-head(out3$checks$freeman$table[,c(8:10)], n = 5)
+head(out3$checks$freeman$table[,c(8:10)], n = 5) # msiAssess
 ```
 
-                 Rhat n.eff    param
-    deviance 3.187187     4 deviance
-    theta    3.134380     4    theta
-    b[11]    1.200830   300    b[11]
-    b[10]    1.195896   300    b[10]
-    b[1]     1.185482   150     b[1]
+                  Rhat n.eff     param
+    log_theta 2.782062     4 log_theta
+    theta     2.782062     4     theta
+    deviance  2.751351     4  deviance
+    b[12]     1.253255   150     b[12]
+    g[88,25]  1.228028    86  g[88,25]
 
-Note also the Rhat stats for `msiAssess` model run (these are not
-available for `BRCIndicators`: see issue
-[here](https://github.com/BiologicalRecordsCentre/BRCindicators/issues/90)
-). The global SE parameter, `theta`, is far from converging. The same
-behaviour has been observed with an empirical dataset with longer
-chains, namely `n_iter = 1000`.
+``` r
+rhat <- attributes(mod)$model$Rhat
+rhat$theta # BRCIndicators
+```
+
+    [1] 3.322907
+
+Note also the Rhat stats for the two model runs. The global SE
+parameter, `theta`, has not converged. The same behaviour has been
+observed with an empirical dataset.
 
 ## References
 

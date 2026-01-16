@@ -944,8 +944,24 @@ model {
   w3 <- equals(obs_var_model, 3)  # global scale 'c' on SEs
   w4 <- equals(obs_var_model, 4)  # common theta
   c ~ dunif(0, 10)
-  theta ~ dunif(0.0001, 10)
-  tau_theta <- pow(theta, -2)
+  
+  # Old theta parameterisation
+  #theta ~ dunif(0.0001, 10)
+  #tau_theta <- pow(theta, -2)
+  
+  # --- Reparameterised theta: prior on log(theta) ---
+  # Weakly-informative lognormal prior centred around ~0.2, widespread.
+  mu_log_theta <- log(0.2)
+  sd_log_theta <- 2
+  tau_log_theta <- pow(sd_log_theta, -2)
+
+  # Truncate to match old support: i.e. theta in [1e-4, 10]
+  log_theta ~ dnorm(mu_log_theta, tau_log_theta) T(log(1.0E-4), log(10))
+  theta <- exp(log_theta)
+
+  # Numerically stable precision:
+  tau_theta <- exp(-2 * log_theta)
+  # --------------------------------------------------
 
   # Common smoothed growth for t = 1..(nyears-1)
   for (t in 1:(nyears-1)) {
@@ -1013,8 +1029,8 @@ run_freeman_brc <- function(data_list, n_iter = 4000, n_burnin = 1000, n_chains 
   if (!is.null(seed)) set.seed(seed)
   R2jags::jags(
     data = data_list,
-    parameters.to.save = c("beta","b","taub","sigma_spi","theta","Lambda","Gexp",
-                           "M","Mprime","spindex","g", "anchor"), # add anchor
+    parameters.to.save = c("beta","b","taub","sigma_spi","theta","log_theta","Lambda","Gexp",
+                           "M","Mprime","spindex","g", "anchor"), # add anchor and log_theta
     model.file = textConnection(freeman_brc_model),
     n.chains = n_chains, n.iter = n_iter, n.burnin = n_burnin, n.thin = n_thin, 
     quiet = quiet
@@ -2051,8 +2067,11 @@ filter_indicator_plot <- function(p,
 #### TO DO ####
 # LARGER:
 # Add monitored parameters to model options in run_full_analysis (i.e. option to control monitored nodes)
+# # it would also be good here to add the option to only monitor slices of massive arrays -- function could
+# # theoretically be used to monitor "representative" taxa (e.g. early/mid/late joining species)
 # Shrinkage evaluation! (cf. backing out weights lit.)
 # Inspect impact of p_init on bias (low p_init reduces MNAR bias? interaction with entry_mode?)
+# Different imputations models for the Bayesian geometric mean
 #
 # SMALLER:
 # Sampled species line not being plotted in some cases (see textfile settings)

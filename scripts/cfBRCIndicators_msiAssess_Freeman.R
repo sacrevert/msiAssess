@@ -1,6 +1,7 @@
 ## Test msiAssess Freeman (ovm = 4) versus BRCIndicators
-source("scripts/00_newSimsFramework_30102025.R")
-library(devtools)
+#source("scripts/00_newSimsFramework_30102025.R") # indicatorTo2023_msiAssess_ovm4_251203.rds run
+source("scripts/00_newSimsFramework_15012026.R") # 1512026 run
+#library(devtools)
 library(BRCindicators)
 #install_github(repo = 'biologicalrecordscentre/BRCindicators')
 offDat <- read.csv(file = "data/fionaDat/d4a_spp_ts_engto23_Smoothed_unsmVP.csv")
@@ -31,23 +32,32 @@ taxa <- unique(data$group)
 ypk <- 3L
 p <- expand.grid(ypk = ypk, gr = setdiff(taxa, c("moths", "fish")))
 n.yr    <- length(unique(inddat$year))
-n.knots <- round(n.yr / ypk)
+n.knots <- round(n.yr / ypk) # n.knots = 18
 spTrends = FALSE
 nit = 5000
 
-# ## Note that this function does not return model RHats
+# ## Note that this function does return Rhats for some parameters given that incl.model = T (default)
+# n.chains hardcoded to 3 in bma()
 # mod <- BRCindicators::bma(data = inddat, 
 #            num.knots = n.knots,
 #            parallel = TRUE,
 #            plot = FALSE,
+#            model = 'smooth', # default
+#            seFromData = FALSE, # default
+#            Y1perfect = TRUE, # default
+#            errorY1 = FALSE, # default
 #            n.iter = nit,
-#            save.sppars = spTrends)
+#            n.thin = 5, # default
+#            incl.model = TRUE, # default
+#            save.sppars = spTrends) # FALSE
 # saveRDS(mod, file=paste0("data/fionaDat/all_",
 #                          ypk,"ypk_L_",
 #                          nit/1000,"kit_",
 #                          format(Sys.Date(),"%y%m%d"),".rds"))
 # mod <- readRDS("data/fionaDat/all_3ypk_L_5kit_251128.rds")
 # plot(mod$Year, mod$Index.Mprime) # matches DataLabs plot for ypk = 3
+modRhats <- attributes(mod)$model$Rhat # rhats of (hard-coded) parameters (note that general advice is that rhat > 1.1 = not converged/bad)
+modq50 <- attributes(mod)$model$q50 # median estimates
 
 ## indices for msiAssess
 inddat$year <- as.integer(as.character(inddat$year))
@@ -58,20 +68,22 @@ msiDat <- msiDat[,-1]
 colnames(msiDat) <- as.numeric(sub("index\\.", "", colnames(msiDat)))
 msiDat <- msiDat[, order(as.numeric(colnames(msiDat))), drop = FALSE]
 
+# --------------------------------------------------------------------------------------
 # test as_sim_from_empirical(), but don't use output as this function is called within
 # run_full_analysis() at the beginning
 #msiDat_ <- as_sim_from_empirical(as.matrix(msiDat))
-# modMsiAssess <- run_full_analysis(data_source = "empirical", # simulated data or empirical?
-#                          empirical_index_mat = as.matrix(msiDat),
-#                          fit_models = c("freeman"),
-#                          ## Model-specific settings (match BRCIndicators defaults)
-#                          jags_freeman = list(obs_var_model=4, n_iter=5000, n_thin=5,
-#                                              n_chains=3, n_burnin=2500), # floor(n_iter/2)) # latter is BRCInd default
-#                          ## Cross-model settings (match Freeman settings above)
-#                          brc_opts = list(num_knots = 18, seFromData = FALSE,
-#                                          Y1perfect = TRUE, m.scale = "loge"),
-#                          ## Growth-rate presentation scale (model returns both anyway, this is for plot)
-#                          growth_scale = "log", quiet = FALSE) # suppress JAGS output or not
+# run with 30102025 version first
+modMsiAssess <- run_full_analysis(data_source = "empirical", # simulated data or empirical?
+                         empirical_index_mat = as.matrix(msiDat),
+                         fit_models = c("freeman"),
+                         ## Model-specific settings (match BRCIndicators defaults)
+                         jags_freeman = list(obs_var_model=4, n_iter=5000, n_thin=5,
+                                             n_chains=3, n_burnin=2500), # floor(n_iter/2)) # latter is BRCInd default
+                         ## Cross-model settings (match Freeman settings above)
+                         brc_opts = list(num_knots = 18, seFromData = FALSE,
+                                         Y1perfect = TRUE, m.scale = "loge"),
+                         ## Growth-rate presentation scale (model returns both anyway, this is for plot)
+                         growth_scale = "log", quiet = FALSE) # suppress JAGS output or not
 # saveRDS(modMsiAssess, file = paste0("outputs/indicatorTo2023_msiAssess_ovm4_",
 #                          format(Sys.Date(),"%y%m%d"),".rds"))
 # modMsiAssess <- readRDS(file = "outputs/indicatorTo2023_msiAssess_ovm4_251203.rds")
@@ -79,7 +91,35 @@ modMsiAssess$checks # worth noting that theta has an Rhat of 2.33 here
 print(modMsiAssess$plots$MSI) # M_prime
 print(modMsiAssess$plots$CumLog) # m
 evaluate_inclusion_process(modMsiAssess$sim)
+#fyList <- evaluate_inclusion_process(modMsiAssess$sim)$entry_stats$FY
+#foo<-environment(modMsiAssess[["fits"]][["freeman"]][["model"]][["data"]])[["data"]][["y1perfect_mask"]]
+#apply(foo,1,sum) # numbers of sp with FY in a given year
 #plot_species_trends(modMsiAssess, n_sample = 12, scale = "log")
+
+# --------------------------------------------------------------------------------------
+# 15-01-2026 v. run with updated theta parameterisation
+modMsiAssess_150126 <- run_full_analysis(data_source = "empirical", # simulated data or empirical?
+                                  empirical_index_mat = as.matrix(msiDat),
+                                  fit_models = c("freeman"),
+                                  ## Model-specific settings (match BRCIndicators defaults)
+                                  jags_freeman = list(obs_var_model=4, n_iter=5000, n_thin=5,
+                                                      n_chains=3, n_burnin=2500), # floor(n_iter/2)) # latter is BRCInd default
+                                  ## Cross-model settings (match Freeman settings above)
+                                  brc_opts = list(num_knots = 18, seFromData = FALSE,
+                                                  Y1perfect = TRUE, m.scale = "loge"),
+                                  ## Growth-rate presentation scale (model returns both anyway, this is for plot)
+                                  growth_scale = "log", quiet = FALSE) # suppress JAGS output or not
+saveRDS(modMsiAssess_150126, file = paste0("outputs/indicatorTo2023_msiAssess_ovm4_",
+                         format(Sys.Date(),"%y%m%d"),".rds"))
+# modMsiAssess_150126 <- readRDS(file = "outputs/indicatorTo2023_msiAssess_ovm4_260115.rds")
+modMsiAssess_150126$checks # theta is 1.15 now
+print(modMsiAssess_150126$plots$MSI) # M_prime
+print(modMsiAssess_150126$plots$CumLog) # m
+evaluate_inclusion_process(modMsiAssess_150126$sim)
+#fyList <- evaluate_inclusion_process(modMsiAssess_150126$sim)$entry_stats$FY
+#foo2<-environment(modMsiAssess_150126[["fits"]][["freeman"]][["model"]][["data"]])[["data"]][["y1perfect_mask"]]
+#apply(foo2,1,sum) # numbers of sp with FY in a given year
+#plot_species_trends(modMsiAssess_150126, n_sample = 12, scale = "log")
 
 ### Simulated examples
 ## Run BRCindicators using sim from msiAssess (example 1 in README)
